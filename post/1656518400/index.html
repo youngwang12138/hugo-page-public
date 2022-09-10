@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="zh-cn" dir="ltr">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content='前言 Consul 是一个服务网格解决方案，提供具有服务发现、配置和分段功能的全功能控制平面。这些功能中的每一个都可以根据需要单独使用，也可以一起使用来构建完整的service mesh。
+安转Consul和Fabio Install Consul
+Fabio Quickstart
+我这里采用本地运行的方式
+  运行consul
+1  ./consul.exe agent -dev   web页面地址localhost:8500
+  运行Fabio
+注意此处的端口号及协议类型
+1  ./fabio-1.6.0-windows_amd64.exe -proxy.addr &amp;#39;:10000;proto=grpc&amp;#39;   web 页面地址http://localhost:9998/
+  gRPC服务端   golang代码如下，其中要注意的点：1、 registrationInfo.ID 不能重复；2、registrationInfo.Tags 需要有前缀才能被Fabio代理，以及协议要与前面启动Fabio处要对应；3、registrationInfo.Check 需要添加，因为Fabio只对健康检测通过的服务进行监控
+1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90  package main import ( &amp;#34;context&amp;#34; &amp;#34;encoding/json&amp;#34; &amp;#34;flag&amp;#34; &amp;#34;fmt&amp;#34; &amp;#34;log&amp;#34; &amp;#34;net&amp;#34; pb &amp;#34;google.'><title>使用consul和Fabio做RPC的服务发现</title>
+
+<link rel='canonical' href='https://zhongyang.wang/post/1656518400/'>
+
+<link rel="stylesheet" href="/scss/style.min.ad5538b69fbe914e5aa7385dbe923e0e3144576f59e2781bc977d89c53c9e52e.css"><script async src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script><meta property='og:title' content='使用consul和Fabio做RPC的服务发现'>
+<meta property='og:description' content='前言 Consul 是一个服务网格解决方案，提供具有服务发现、配置和分段功能的全功能控制平面。这些功能中的每一个都可以根据需要单独使用，也可以一起使用来构建完整的service mesh。
+安转Consul和Fabio Install Consul
+Fabio Quickstart
+我这里采用本地运行的方式
+  运行consul
+1  ./consul.exe agent -dev   web页面地址localhost:8500
+  运行Fabio
+注意此处的端口号及协议类型
+1  ./fabio-1.6.0-windows_amd64.exe -proxy.addr &amp;#39;:10000;proto=grpc&amp;#39;   web 页面地址http://localhost:9998/
+  gRPC服务端   golang代码如下，其中要注意的点：1、 registrationInfo.ID 不能重复；2、registrationInfo.Tags 需要有前缀才能被Fabio代理，以及协议要与前面启动Fabio处要对应；3、registrationInfo.Check 需要添加，因为Fabio只对健康检测通过的服务进行监控
+1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90  package main import ( &amp;#34;context&amp;#34; &amp;#34;encoding/json&amp;#34; &amp;#34;flag&amp;#34; &amp;#34;fmt&amp;#34; &amp;#34;log&amp;#34; &amp;#34;net&amp;#34; pb &amp;#34;google.'>
+<meta property='og:url' content='https://zhongyang.wang/post/1656518400/'>
+<meta property='og:site_name' content='Young 小站'>
+<meta property='og:type' content='article'><meta property='article:section' content='Post' /><meta property='article:tag' content='微服务' /><meta property='article:tag' content='consul' /><meta property='article:published_time' content='2022-06-30T01:01:45&#43;00:00'/><meta property='article:modified_time' content='2022-06-30T01:01:45&#43;00:00'/>
+<meta name="twitter:title" content="使用consul和Fabio做RPC的服务发现">
+<meta name="twitter:description" content="前言 Consul 是一个服务网格解决方案，提供具有服务发现、配置和分段功能的全功能控制平面。这些功能中的每一个都可以根据需要单独使用，也可以一起使用来构建完整的service mesh。
+安转Consul和Fabio Install Consul
+Fabio Quickstart
+我这里采用本地运行的方式
+  运行consul
+1  ./consul.exe agent -dev   web页面地址localhost:8500
+  运行Fabio
+注意此处的端口号及协议类型
+1  ./fabio-1.6.0-windows_amd64.exe -proxy.addr &amp;#39;:10000;proto=grpc&amp;#39;   web 页面地址http://localhost:9998/
+  gRPC服务端   golang代码如下，其中要注意的点：1、 registrationInfo.ID 不能重复；2、registrationInfo.Tags 需要有前缀才能被Fabio代理，以及协议要与前面启动Fabio处要对应；3、registrationInfo.Check 需要添加，因为Fabio只对健康检测通过的服务进行监控
+1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90  package main import ( &amp;#34;context&amp;#34; &amp;#34;encoding/json&amp;#34; &amp;#34;flag&amp;#34; &amp;#34;fmt&amp;#34; &amp;#34;log&amp;#34; &amp;#34;net&amp;#34; pb &amp;#34;google.">
+    <link rel="shortcut icon" href="https://user-images.githubusercontent.com/15307132/188314728-04fe4f56-001b-4bc2-867a-50c3182d0082.png" />
+
+    </head>
+    <body class="
+    article-page
+    ">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            localStorage.setItem(colorSchemeKey, "auto");
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
+    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="Toggle Menu">
+        <span class="hamburger-box">
+            <span class="hamburger-inner"></span>
+        </span>
+    </button>
+
+    <header>
+        
+            
+            <figure class="site-avatar">
+                <a href="/">
+                
+                    
+                    
+                    
+                        
+                        <img src="/img/avatar_hu2b53bd9d8e6ccce645265e271155cd47_75253_300x0_resize_box_3.png" width="300"
+                            height="300" class="site-logo" loading="lazy" alt="Avatar">
+                    
+                
+                </a>
+                
+                    <span class="emoji">🧐</span>
+                
+            </figure>
+            
+        
+        
+        <div class="site-meta">
+            <h1 class="site-name"><a href="/">Young 小站</a></h1>
+            <h2 class="site-description">冲啊，无往而不利</h2>
+        </div>
+    </header><ol class="menu" id="main-menu">
+        
+        
+        
+
+        <li >
+            <a href='/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="5 12 3 12 12 3 21 12 19 12" />
+  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
+  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
+</svg>
+
+
+
+                
+                <span>首页</span>
+            </a>
+        </li>
+        
+        
+
+        <li >
+            <a href='/archives/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>归档</span>
+            </a>
+        </li>
+        
+        
+
+        <li >
+            <a href='/search/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+
+                
+                <span>搜索</span>
+            </a>
+        </li>
+        
+        
+
+        <li >
+            <a href='/link/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
+  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
+</svg>
+
+
+
+                
+                <span>链接</span>
+            </a>
+        </li>
+        
+
+        <div class="menu-bottom-section">
+            
+            
+        </div>
+    </ol>
+</aside>
+<main class="main full-width">
+    <article class="main-article">
+    <header class="article-header">
+
+    <div class="article-details">
+    
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="/post/1656518400/">使用consul和Fabio做RPC的服务发现</a>
+        </h2>
+    
+        
+    </div>
+
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published">2022-06-30</time>
+            </div>
+        
+
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-clock" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <polyline points="12 7 12 12 15 15" />
+</svg>
+
+
+
+                <time class="article-time--reading">
+                    3 minute read
+                </time>
+            </div>
+        
+        <div>
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-eye" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="#bababa" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+  <circle cx="12" cy="12" r="2"></circle>
+  <path d="M22 12c-2.667 4.667 -6 7 -10 7s-7.333 -2.333 -10 -7c2.667 -4.667 6 -7 10 -7s7.333 2.333 10 7"></path>
+</svg>
+            <time class="article-time--reading" >
+                <span><span id="busuanzi_value_page_pv"></span>次</span>
+            </time>
+        </div>
+    </footer>
+    
+
+    
+</div>
+</header>
+
+    <section class="article-content">
+    
+    
+    <h3 id="前言">前言</h3>
+<p>Consul 是一个服务网格解决方案，提供具有服务发现、配置和分段功能的全功能控制平面。这些功能中的每一个都可以根据需要单独使用，也可以一起使用来构建完整的<code>service mesh</code>。</p>
+<!-- raw HTML omitted -->
+<h3 id="安转consul和fabio">安转Consul和Fabio</h3>
+<p><a class="link" href="https://www.consul.io/docs/install"  target="_blank" rel="noopener"
+    >Install Consul</a></p>
+<p><a class="link" href="https://fabiolb.net/quickstart/"  target="_blank" rel="noopener"
+    >Fabio Quickstart</a></p>
+<p>我这里采用本地运行的方式</p>
+<ul>
+<li>
+<p>运行consul</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-sh" data-lang="sh">./consul.exe agent -dev
+</code></pre></td></tr></table>
+</div>
+</div><p>web页面地址<code>localhost:8500</code></p>
+</li>
+<li>
+<p>运行Fabio</p>
+<p><em><strong>注意此处的端口号及协议类型</strong></em></p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-sh" data-lang="sh">./fabio-1.6.0-windows_amd64.exe -proxy.addr <span class="s1">&#39;:10000;proto=grpc&#39;</span>
+</code></pre></td></tr></table>
+</div>
+</div><p>web 页面地址<code>http://localhost:9998/</code></p>
+</li>
+</ul>
+<h3 id="grpc服务端">gRPC服务端</h3>
+<ol>
+<li>
+<p>golang代码如下，其中要注意的点：1、 <code>registrationInfo.ID</code> 不能重复；2、<code>registrationInfo.Tags</code> 需要有前缀才能被Fabio代理，以及协议要与前面启动Fabio处要对应；3、<code>registrationInfo.Check</code> 需要添加，因为Fabio只对健康检测通过的服务进行监控</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span><span class="lnt">18
+</span><span class="lnt">19
+</span><span class="lnt">20
+</span><span class="lnt">21
+</span><span class="lnt">22
+</span><span class="lnt">23
+</span><span class="lnt">24
+</span><span class="lnt">25
+</span><span class="lnt">26
+</span><span class="lnt">27
+</span><span class="lnt">28
+</span><span class="lnt">29
+</span><span class="lnt">30
+</span><span class="lnt">31
+</span><span class="lnt">32
+</span><span class="lnt">33
+</span><span class="lnt">34
+</span><span class="lnt">35
+</span><span class="lnt">36
+</span><span class="lnt">37
+</span><span class="lnt">38
+</span><span class="lnt">39
+</span><span class="lnt">40
+</span><span class="lnt">41
+</span><span class="lnt">42
+</span><span class="lnt">43
+</span><span class="lnt">44
+</span><span class="lnt">45
+</span><span class="lnt">46
+</span><span class="lnt">47
+</span><span class="lnt">48
+</span><span class="lnt">49
+</span><span class="lnt">50
+</span><span class="lnt">51
+</span><span class="lnt">52
+</span><span class="lnt">53
+</span><span class="lnt">54
+</span><span class="lnt">55
+</span><span class="lnt">56
+</span><span class="lnt">57
+</span><span class="lnt">58
+</span><span class="lnt">59
+</span><span class="lnt">60
+</span><span class="lnt">61
+</span><span class="lnt">62
+</span><span class="lnt">63
+</span><span class="lnt">64
+</span><span class="lnt">65
+</span><span class="lnt">66
+</span><span class="lnt">67
+</span><span class="lnt">68
+</span><span class="lnt">69
+</span><span class="lnt">70
+</span><span class="lnt">71
+</span><span class="lnt">72
+</span><span class="lnt">73
+</span><span class="lnt">74
+</span><span class="lnt">75
+</span><span class="lnt">76
+</span><span class="lnt">77
+</span><span class="lnt">78
+</span><span class="lnt">79
+</span><span class="lnt">80
+</span><span class="lnt">81
+</span><span class="lnt">82
+</span><span class="lnt">83
+</span><span class="lnt">84
+</span><span class="lnt">85
+</span><span class="lnt">86
+</span><span class="lnt">87
+</span><span class="lnt">88
+</span><span class="lnt">89
+</span><span class="lnt">90
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="kn">package</span> <span class="nx">main</span>
+
+<span class="kn">import</span> <span class="p">(</span>
+    <span class="s">&#34;context&#34;</span>
+    <span class="s">&#34;encoding/json&#34;</span>
+    <span class="s">&#34;flag&#34;</span>
+    <span class="s">&#34;fmt&#34;</span>
+    <span class="s">&#34;log&#34;</span>
+    <span class="s">&#34;net&#34;</span>
+
+    <span class="nx">pb</span> <span class="s">&#34;google.golang.org/grpc/examples/helloworld/helloworld&#34;</span>
+
+    <span class="s">&#34;github.com/hashicorp/consul/api&#34;</span>
+
+    <span class="s">&#34;google.golang.org/grpc&#34;</span>
+<span class="p">)</span>
+
+<span class="kd">var</span> <span class="p">(</span>
+    <span class="nx">port</span>     <span class="o">*</span><span class="kt">int</span>
+    <span class="nx">client</span>   <span class="o">*</span><span class="nx">api</span><span class="p">.</span><span class="nx">Client</span>
+    <span class="nx">serverId</span> <span class="kt">string</span>
+<span class="p">)</span>
+
+<span class="c1">// server is used to implement helloworld.GreeterServer.
+</span><span class="c1"></span><span class="kd">type</span> <span class="nx">server</span> <span class="kd">struct</span> <span class="p">{</span>
+    <span class="nx">pb</span><span class="p">.</span><span class="nx">UnimplementedGreeterServer</span>
+    <span class="nx">port</span> <span class="kt">int</span>
+<span class="p">}</span>
+
+<span class="kd">type</span> <span class="nx">Resp</span> <span class="kd">struct</span> <span class="p">{</span>
+    <span class="nx">Port</span> <span class="kt">int</span>    <span class="s">`json:&#34;port&#34;`</span>
+    <span class="nx">Name</span> <span class="kt">string</span> <span class="s">`json:&#34;name&#34;`</span>
+<span class="p">}</span>
+
+<span class="c1">// SayHello implements helloworld.GreeterServer
+</span><span class="c1"></span><span class="kd">func</span> <span class="p">(</span><span class="nx">s</span> <span class="o">*</span><span class="nx">server</span><span class="p">)</span> <span class="nf">SayHello</span><span class="p">(</span><span class="nx">ctx</span> <span class="nx">context</span><span class="p">.</span><span class="nx">Context</span><span class="p">,</span> <span class="nx">in</span> <span class="o">*</span><span class="nx">pb</span><span class="p">.</span><span class="nx">HelloRequest</span><span class="p">)</span> <span class="p">(</span><span class="o">*</span><span class="nx">pb</span><span class="p">.</span><span class="nx">HelloReply</span><span class="p">,</span> <span class="kt">error</span><span class="p">)</span> <span class="p">{</span>
+    <span class="nx">resp</span><span class="p">,</span> <span class="nx">_</span> <span class="o">:=</span> <span class="nx">json</span><span class="p">.</span><span class="nf">Marshal</span><span class="p">(</span>
+        <span class="nx">Resp</span><span class="p">{</span>
+            <span class="nx">Port</span><span class="p">:</span> <span class="nx">s</span><span class="p">.</span><span class="nx">port</span><span class="p">,</span>
+            <span class="nx">Name</span><span class="p">:</span> <span class="nx">in</span><span class="p">.</span><span class="nf">GetName</span><span class="p">(),</span>
+        <span class="p">})</span>
+    <span class="k">return</span> <span class="o">&amp;</span><span class="nx">pb</span><span class="p">.</span><span class="nx">HelloReply</span><span class="p">{</span><span class="nx">Message</span><span class="p">:</span> <span class="nb">string</span><span class="p">(</span><span class="nx">resp</span><span class="p">)},</span> <span class="kc">nil</span>
+<span class="p">}</span>
+<span class="kd">func</span> <span class="nf">main</span><span class="p">()</span> <span class="p">{</span>
+    <span class="k">defer</span> <span class="nx">client</span><span class="p">.</span><span class="nf">Agent</span><span class="p">().</span><span class="nf">ServiceDeregister</span><span class="p">(</span><span class="nx">serverId</span><span class="p">)</span>
+    <span class="nx">lis</span><span class="p">,</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">net</span><span class="p">.</span><span class="nf">Listen</span><span class="p">(</span><span class="s">&#34;tcp&#34;</span><span class="p">,</span> <span class="nx">fmt</span><span class="p">.</span><span class="nf">Sprintf</span><span class="p">(</span><span class="s">&#34;:%d&#34;</span><span class="p">,</span> <span class="o">*</span><span class="nx">port</span><span class="p">))</span>
+    <span class="k">if</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+        <span class="nx">log</span><span class="p">.</span><span class="nf">Fatalf</span><span class="p">(</span><span class="s">&#34;failed to listen: %v&#34;</span><span class="p">,</span> <span class="nx">err</span><span class="p">)</span>
+    <span class="p">}</span>
+    <span class="nx">s</span> <span class="o">:=</span> <span class="nx">grpc</span><span class="p">.</span><span class="nf">NewServer</span><span class="p">()</span>
+    <span class="nx">pb</span><span class="p">.</span><span class="nf">RegisterGreeterServer</span><span class="p">(</span><span class="nx">s</span><span class="p">,</span> <span class="o">&amp;</span><span class="nx">server</span><span class="p">{</span><span class="nx">port</span><span class="p">:</span> <span class="o">*</span><span class="nx">port</span><span class="p">})</span>
+    <span class="nx">log</span><span class="p">.</span><span class="nf">Printf</span><span class="p">(</span><span class="s">&#34;server listening at %v&#34;</span><span class="p">,</span> <span class="nx">lis</span><span class="p">.</span><span class="nf">Addr</span><span class="p">())</span>
+    <span class="k">if</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">s</span><span class="p">.</span><span class="nf">Serve</span><span class="p">(</span><span class="nx">lis</span><span class="p">);</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+        <span class="nx">log</span><span class="p">.</span><span class="nf">Fatalf</span><span class="p">(</span><span class="s">&#34;failed to serve: %v&#34;</span><span class="p">,</span> <span class="nx">err</span><span class="p">)</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="nf">init</span><span class="p">()</span> <span class="p">{</span>
+    <span class="nx">port</span> <span class="p">=</span> <span class="nx">flag</span><span class="p">.</span><span class="nf">Int</span><span class="p">(</span><span class="s">&#34;port&#34;</span><span class="p">,</span> <span class="mi">50051</span><span class="p">,</span> <span class="s">&#34;The server port&#34;</span><span class="p">)</span>
+    <span class="nx">flag</span><span class="p">.</span><span class="nf">Parse</span><span class="p">()</span>
+    <span class="nx">serverId</span> <span class="p">=</span> <span class="nx">fmt</span><span class="p">.</span><span class="nf">Sprintf</span><span class="p">(</span><span class="s">&#34;gRPC_id_%d&#34;</span><span class="p">,</span> <span class="o">*</span><span class="nx">port</span><span class="p">)</span>
+    <span class="nf">Registration</span><span class="p">(</span><span class="o">*</span><span class="nx">port</span><span class="p">)</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="nf">Registration</span><span class="p">(</span><span class="nx">port</span> <span class="kt">int</span><span class="p">)</span> <span class="p">{</span>
+    <span class="kd">var</span> <span class="nx">err</span> <span class="kt">error</span>
+    <span class="nx">client</span><span class="p">,</span> <span class="nx">err</span> <span class="p">=</span> <span class="nx">api</span><span class="p">.</span><span class="nf">NewClient</span><span class="p">(</span><span class="nx">api</span><span class="p">.</span><span class="nf">DefaultConfig</span><span class="p">())</span>
+    <span class="k">if</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+        <span class="nb">panic</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span>
+    <span class="p">}</span>
+    <span class="c1">//注册信息
+</span><span class="c1"></span>    <span class="nx">registrationInfo</span> <span class="o">:=</span> <span class="nx">api</span><span class="p">.</span><span class="nx">AgentServiceRegistration</span><span class="p">{</span>
+        <span class="nx">ID</span><span class="p">:</span>      <span class="nx">serverId</span><span class="p">,</span>
+        <span class="nx">Name</span><span class="p">:</span>    <span class="s">&#34;gRPCServer&#34;</span><span class="p">,</span>
+        <span class="nx">Port</span><span class="p">:</span>    <span class="nx">port</span><span class="p">,</span>
+        <span class="nx">Tags</span><span class="p">:</span>    <span class="p">[]</span><span class="kt">string</span><span class="p">{</span><span class="s">&#34;urlprefix-/&#34;</span><span class="p">,</span> <span class="s">&#34;proto=grpc&#34;</span><span class="p">},</span>
+        <span class="nx">Address</span><span class="p">:</span> <span class="s">&#34;192.168.1.103&#34;</span><span class="p">,</span>
+        <span class="nx">Check</span><span class="p">:</span> <span class="o">&amp;</span><span class="nx">api</span><span class="p">.</span><span class="nx">AgentServiceCheck</span><span class="p">{</span>
+            <span class="nx">CheckID</span><span class="p">:</span>  <span class="nx">fmt</span><span class="p">.</span><span class="nf">Sprintf</span><span class="p">(</span><span class="s">&#34;gRPCServerCheck:%d&#34;</span><span class="p">,</span> <span class="nx">port</span><span class="p">),</span>
+            <span class="nx">TCP</span><span class="p">:</span>      <span class="nx">fmt</span><span class="p">.</span><span class="nf">Sprintf</span><span class="p">(</span><span class="s">&#34;192.168.1.103:%d&#34;</span><span class="p">,</span> <span class="nx">port</span><span class="p">),</span>
+            <span class="nx">Interval</span><span class="p">:</span> <span class="s">&#34;2s&#34;</span><span class="p">,</span>
+            <span class="nx">Timeout</span><span class="p">:</span>  <span class="s">&#34;5s&#34;</span><span class="p">,</span>
+        <span class="p">},</span>
+    <span class="p">}</span>
+    <span class="k">if</span> <span class="nx">err</span> <span class="p">=</span> <span class="nx">client</span><span class="p">.</span><span class="nf">Agent</span><span class="p">().</span><span class="nf">ServiceRegister</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">registrationInfo</span><span class="p">);</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+        <span class="nx">log</span><span class="p">.</span><span class="nf">Fatalf</span><span class="p">(</span><span class="s">&#34;ServiceRegister error:%s&#34;</span><span class="p">,</span> <span class="nx">err</span><span class="p">.</span><span class="nf">Error</span><span class="p">())</span>
+    <span class="p">}</span>
+
+<span class="p">}</span>
+
+</code></pre></td></tr></table>
+</div>
+</div></li>
+<li>
+<p>在三个终端运行服务</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-sh" data-lang="sh">go run main.go -port<span class="o">=</span><span class="m">50001</span>
+go run main.go -port<span class="o">=</span><span class="m">50002</span>
+go run main.go -port<span class="o">=</span><span class="m">50003</span>
+</code></pre></td></tr></table>
+</div>
+</div></li>
+<li>
+<p>运行效果
+在consul中，可以看到有一个名为<code>gRPCServer</code>的服务，该服务下有三个示例
+<img src="/post/2022_06_30_1.png"
+	
+	
+	
+	loading="lazy"
+	
+		alt="consul servers"
+	
+	
+>
+在Fabio中的<code>Routing Table</code>如图：
+<img src="/post/2022_06_30_2.png"
+	
+	
+	
+	loading="lazy"
+	
+		alt="Routing Table"
+	
+	
+></p>
+</li>
+</ol>
+<h3 id="grpc客户端">gRPC客户端</h3>
+<ol>
+<li>golang代码如下，<em><strong>请求的端口为启动Fabio中处的端口，(即10000)</strong></em>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span><span class="lnt">18
+</span><span class="lnt">19
+</span><span class="lnt">20
+</span><span class="lnt">21
+</span><span class="lnt">22
+</span><span class="lnt">23
+</span><span class="lnt">24
+</span><span class="lnt">25
+</span><span class="lnt">26
+</span><span class="lnt">27
+</span><span class="lnt">28
+</span><span class="lnt">29
+</span><span class="lnt">30
+</span><span class="lnt">31
+</span><span class="lnt">32
+</span><span class="lnt">33
+</span><span class="lnt">34
+</span><span class="lnt">35
+</span><span class="lnt">36
+</span><span class="lnt">37
+</span><span class="lnt">38
+</span><span class="lnt">39
+</span><span class="lnt">40
+</span><span class="lnt">41
+</span><span class="lnt">42
+</span><span class="lnt">43
+</span><span class="lnt">44
+</span><span class="lnt">45
+</span><span class="lnt">46
+</span><span class="lnt">47
+</span><span class="lnt">48
+</span><span class="lnt">49
+</span><span class="lnt">50
+</span><span class="lnt">51
+</span><span class="lnt">52
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"> <span class="kn">package</span> <span class="nx">main</span>
+
+ <span class="kn">import</span> <span class="p">(</span>
+     <span class="s">&#34;context&#34;</span>
+     <span class="s">&#34;encoding/json&#34;</span>
+     <span class="s">&#34;fmt&#34;</span>
+     <span class="s">&#34;log&#34;</span>
+
+     <span class="s">&#34;google.golang.org/grpc&#34;</span>
+     <span class="s">&#34;google.golang.org/grpc/credentials/insecure&#34;</span>
+     <span class="nx">pb</span> <span class="s">&#34;google.golang.org/grpc/examples/helloworld/helloworld&#34;</span>
+ <span class="p">)</span>
+
+ <span class="kd">func</span> <span class="nf">main</span><span class="p">()</span> <span class="p">{</span>
+     <span class="nx">numMap</span> <span class="o">:=</span> <span class="kd">map</span><span class="p">[</span><span class="kt">int</span><span class="p">]</span><span class="kt">int</span><span class="p">{</span>
+         <span class="mi">50001</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+         <span class="mi">50002</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+         <span class="mi">50003</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+     <span class="p">}</span>
+     <span class="k">for</span> <span class="nx">i</span> <span class="o">:=</span> <span class="mi">0</span><span class="p">;</span> <span class="nx">i</span> <span class="p">&lt;</span> <span class="mi">1000</span><span class="p">;</span> <span class="nx">i</span><span class="o">++</span> <span class="p">{</span>
+         <span class="nx">respPort</span> <span class="o">:=</span> <span class="nf">Request</span><span class="p">(</span><span class="mi">10000</span><span class="p">)</span>
+         <span class="nx">numMap</span><span class="p">[</span><span class="nx">respPort</span><span class="p">]</span><span class="o">++</span>
+     <span class="p">}</span>
+     <span class="nx">log</span><span class="p">.</span><span class="nf">Println</span><span class="p">(</span><span class="s">&#34;numMap: &#34;</span><span class="p">,</span> <span class="nx">numMap</span><span class="p">)</span>
+ <span class="p">}</span>
+
+ <span class="kd">func</span> <span class="nf">Request</span><span class="p">(</span><span class="nx">port</span> <span class="kt">int</span><span class="p">)</span> <span class="kt">int</span> <span class="p">{</span>
+     <span class="nx">addr</span> <span class="o">:=</span> <span class="nx">fmt</span><span class="p">.</span><span class="nf">Sprintf</span><span class="p">(</span><span class="s">&#34;192.168.1.103:%d&#34;</span><span class="p">,</span> <span class="nx">port</span><span class="p">)</span>
+     <span class="nx">conn</span><span class="p">,</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">grpc</span><span class="p">.</span><span class="nf">Dial</span><span class="p">(</span><span class="nx">addr</span><span class="p">,</span> <span class="nx">grpc</span><span class="p">.</span><span class="nf">WithTransportCredentials</span><span class="p">(</span><span class="nx">insecure</span><span class="p">.</span><span class="nf">NewCredentials</span><span class="p">()))</span>
+     <span class="k">if</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+         <span class="nx">log</span><span class="p">.</span><span class="nf">Fatalf</span><span class="p">(</span><span class="s">&#34;did not connect: %v&#34;</span><span class="p">,</span> <span class="nx">err</span><span class="p">)</span>
+     <span class="p">}</span>
+
+     <span class="c1">//resolver.SetDefaultScheme()
+</span><span class="c1"></span>     <span class="k">defer</span> <span class="nx">conn</span><span class="p">.</span><span class="nf">Close</span><span class="p">()</span>
+     <span class="nx">c</span> <span class="o">:=</span> <span class="nx">pb</span><span class="p">.</span><span class="nf">NewGreeterClient</span><span class="p">(</span><span class="nx">conn</span><span class="p">)</span>
+     <span class="nx">r</span><span class="p">,</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">c</span><span class="p">.</span><span class="nf">SayHello</span><span class="p">(</span><span class="nx">context</span><span class="p">.</span><span class="nf">Background</span><span class="p">(),</span> <span class="o">&amp;</span><span class="nx">pb</span><span class="p">.</span><span class="nx">HelloRequest</span><span class="p">{</span><span class="nx">Name</span><span class="p">:</span> <span class="s">&#34;myName&#34;</span><span class="p">})</span>
+     <span class="k">if</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+         <span class="nx">log</span><span class="p">.</span><span class="nf">Fatalf</span><span class="p">(</span><span class="s">&#34;could not greet: %s&#34;</span><span class="p">,</span> <span class="nx">err</span><span class="p">.</span><span class="nf">Error</span><span class="p">())</span>
+     <span class="p">}</span>
+     <span class="c1">//log.Printf(&#34;resp: %s&#34;, r.GetMessage())
+</span><span class="c1"></span>     <span class="nx">resp</span> <span class="o">:=</span> <span class="nb">new</span><span class="p">(</span><span class="nx">Resp</span><span class="p">)</span>
+     <span class="nx">_</span> <span class="p">=</span> <span class="nx">json</span><span class="p">.</span><span class="nf">Unmarshal</span><span class="p">([]</span><span class="nb">byte</span><span class="p">(</span><span class="nx">r</span><span class="p">.</span><span class="nf">GetMessage</span><span class="p">()),</span> <span class="nx">resp</span><span class="p">)</span>
+     <span class="k">return</span> <span class="nx">resp</span><span class="p">.</span><span class="nx">Port</span>
+
+ <span class="p">}</span>
+
+ <span class="kd">type</span> <span class="nx">Resp</span> <span class="kd">struct</span> <span class="p">{</span>
+     <span class="nx">Port</span> <span class="kt">int</span>    <span class="s">`json:&#34;port&#34;`</span>
+     <span class="nx">Name</span> <span class="kt">string</span> <span class="s">`json:&#34;name&#34;`</span>
+ <span class="p">}</span>
+
+</code></pre></td></tr></table>
+</div>
+</div></li>
+<li>运行及结果
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-sh" data-lang="sh"> go run main.go 
+ 2022/06/30 01:38:56 numMap:  map<span class="o">[</span>50001:339 50002:326 50003:335<span class="o">]</span>
+</code></pre></td></tr></table>
+</div>
+</div>这里统计了各示例被请求的次数，结果与Fabio中各实例的权重相呼应</li>
+</ol>
+<h3 id="个人总结">个人总结</h3>
+<p>consul相对于之前使用过的zookeeper来说，在服务发现这部分的配置会相对简单，且包含了健康检查。对于客户端来说，不需要拉取服务端列表到本地并进行故障处理和负载均衡，请求的是Fabio代理</p>
+
+</section>
+
+
+    <footer class="article-footer">
+    
+    <section class="article-tags">
+        
+            <a href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/">微服务</a>
+        
+            <a href="/tags/consul/">consul</a>
+        
+    </section>
+
+
+    </footer>
+
+
+    
+        <link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/katex@0.15.6/dist/katex.min.css"integrity="sha256-J&#43;iAE0sgH8QSz9hpcDxXIftnj65JEZgNhGcgReTTK9s="crossorigin="anonymous"
+            ><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.15.6/dist/katex.min.js"integrity="sha256-InsNdER1b2xUewP&#43;pKCUJpkhiqwHgqiPXDlIk7GzBu4="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.15.6/dist/contrib/auto-render.min.js"integrity="sha256-y39Mpg7V3D4lhBX4x6O0bUqTV4pSrfgwEfGKfxkOdgI="crossorigin="anonymous"
+                defer
+                >
+            </script><script>
+    window.addEventListener("DOMContentLoaded", () => {
+        renderMathInElement(document.querySelector(`.article-content`), {
+            delimiters: [
+                { left: "$$", right: "$$", display: true },
+                { left: "$", right: "$", display: false },
+                { left: "\\(", right: "\\)", display: false },
+                { left: "\\[", right: "\\]", display: true }
+            ]
+        });})
+</script>
+    
+</article>
+
+    
+
+    
+
+     
+    
+        
+    <div id="gitalk-container"></div>
+<link
+    rel="stylesheet"
+    href="https://cdn.jsdelivr.net/npm/gitalk@1.7.2/dist/gitalk.css"
+/>
+<script src="https://cdn.jsdelivr.net/npm/gitalk@1.7.2/dist/gitalk.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/blueimp-md5@2.18.0/js/md5.min.js"></script>
+<script>
+    const gitalk = new Gitalk({
+        clientID: "ed3bb383ee05b834b19f",
+        clientSecret: "37c40c77c8f164182a17fa86fc1d9f6c78f4ab33",
+        repo: "blog-gitalk",
+        owner: "youngwang12138",
+        admin: ["youngwang12138"],
+        distractionFreeMode: false, 
+        id: md5(location.pathname), 
+    });
+    (function () {
+        if (
+            ["localhost", "127.0.0.1"].indexOf(window.location.hostname) != -1
+        ) {
+            document.getElementById("gitalk-container").innerHTML =
+                "Gitalk comments not available by default when the website is previewed locally.";
+            return;
+        }
+        gitalk.render("gitalk-container");
+    })();
+</script>
+
+
+
+    
+
+    <footer class="site-footer">
+
+    <section class="copyright">
+        &copy; 
+        
+            2020 - 
+        
+        2022 Young 小站
+    </section>
+    
+    <section class="powerby">
+        
+
+        <a href="https://beian.miit.gov.cn/">赣ICP备2021002737号-1</a><br/>
+    </section>
+
+    <section class="powerby">
+        
+            <span><span id="busuanzi_value_site_uv"></span>次</span>|
+            <span><span id="busuanzi_value_site_pv"></span>次</span>
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+            </main>
+    <aside class="sidebar right-sidebar sticky">
+        
+            
+                
+    <section class="widget archives">
+        <div class="widget-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+        </div>
+        <h2 class="widget-title section-title">Table of contents</h2>
+        
+        <div class="widget--toc">
+            <nav id="TableOfContents">
+  <ol>
+    <li>
+      <ol>
+        <li><a href="#前言">前言</a></li>
+        <li><a href="#安转consul和fabio">安转Consul和Fabio</a></li>
+        <li><a href="#grpc服务端">gRPC服务端</a></li>
+        <li><a href="#grpc客户端">gRPC客户端</a></li>
+        <li><a href="#个人总结">个人总结</a></li>
+      </ol>
+    </li>
+  </ol>
+</nav>
+        </div>
+    </section>
+
+            
+        
+    </aside>
+
+
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+    </body>
+</html>

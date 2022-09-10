@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="zh-cn" dir="ltr">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content='前言 做权限验证时，需要对传入的路由与配置的路由进行匹配，判断是否对API有权限。这里比较通过字典树和正则匹配这两种实现方式的性能差异
+权限信息 里面主要包含roleId、url、method
+1 2 3 4 5 6 7 8 9 10 11  { &amp;#34;role_id&amp;#34;: 5, &amp;#34;role_name&amp;#34;: &amp;#34;超级管理员&amp;#34;, &amp;#34;apis&amp;#34;: [ { &amp;#34;name&amp;#34;: &amp;#34;a&amp;#34;, &amp;#34;url&amp;#34;: &amp;#34;github.com/go-redis/:str/redis/v8&amp;#34;, &amp;#34;method&amp;#34;: &amp;#34;GET&amp;#34; } ] }   字典树的实现方式 1 2 3 4 5 6  // 获取一个对象 roleTrieTest = NewRoleTrie() // 根据权限信息生成树 roleTrieTest.Generate(*roleInfo) // 查找，符合条件返回true roleTrieTest.Search(roleId, url, urlMethod)   正则匹配的实现方式 1 2 3 4 5 6  // 获取一个对象 roleTrieTest = NewRoleTrie() // 根据权限信息生成role拥有的URL正则表达式列表 roleTrieTest.'><title>路由匹配方式比较</title>
+
+<link rel='canonical' href='https://zhongyang.wang/post/1658727731/'>
+
+<link rel="stylesheet" href="/scss/style.min.ad5538b69fbe914e5aa7385dbe923e0e3144576f59e2781bc977d89c53c9e52e.css"><script async src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script><meta property='og:title' content='路由匹配方式比较'>
+<meta property='og:description' content='前言 做权限验证时，需要对传入的路由与配置的路由进行匹配，判断是否对API有权限。这里比较通过字典树和正则匹配这两种实现方式的性能差异
+权限信息 里面主要包含roleId、url、method
+1 2 3 4 5 6 7 8 9 10 11  { &amp;#34;role_id&amp;#34;: 5, &amp;#34;role_name&amp;#34;: &amp;#34;超级管理员&amp;#34;, &amp;#34;apis&amp;#34;: [ { &amp;#34;name&amp;#34;: &amp;#34;a&amp;#34;, &amp;#34;url&amp;#34;: &amp;#34;github.com/go-redis/:str/redis/v8&amp;#34;, &amp;#34;method&amp;#34;: &amp;#34;GET&amp;#34; } ] }   字典树的实现方式 1 2 3 4 5 6  // 获取一个对象 roleTrieTest = NewRoleTrie() // 根据权限信息生成树 roleTrieTest.Generate(*roleInfo) // 查找，符合条件返回true roleTrieTest.Search(roleId, url, urlMethod)   正则匹配的实现方式 1 2 3 4 5 6  // 获取一个对象 roleTrieTest = NewRoleTrie() // 根据权限信息生成role拥有的URL正则表达式列表 roleTrieTest.'>
+<meta property='og:url' content='https://zhongyang.wang/post/1658727731/'>
+<meta property='og:site_name' content='Young 小站'>
+<meta property='og:type' content='article'><meta property='article:section' content='Post' /><meta property='article:published_time' content='2022-07-25T13:42:11&#43;00:00'/><meta property='article:modified_time' content='2022-07-25T13:42:11&#43;00:00'/>
+<meta name="twitter:title" content="路由匹配方式比较">
+<meta name="twitter:description" content="前言 做权限验证时，需要对传入的路由与配置的路由进行匹配，判断是否对API有权限。这里比较通过字典树和正则匹配这两种实现方式的性能差异
+权限信息 里面主要包含roleId、url、method
+1 2 3 4 5 6 7 8 9 10 11  { &amp;#34;role_id&amp;#34;: 5, &amp;#34;role_name&amp;#34;: &amp;#34;超级管理员&amp;#34;, &amp;#34;apis&amp;#34;: [ { &amp;#34;name&amp;#34;: &amp;#34;a&amp;#34;, &amp;#34;url&amp;#34;: &amp;#34;github.com/go-redis/:str/redis/v8&amp;#34;, &amp;#34;method&amp;#34;: &amp;#34;GET&amp;#34; } ] }   字典树的实现方式 1 2 3 4 5 6  // 获取一个对象 roleTrieTest = NewRoleTrie() // 根据权限信息生成树 roleTrieTest.Generate(*roleInfo) // 查找，符合条件返回true roleTrieTest.Search(roleId, url, urlMethod)   正则匹配的实现方式 1 2 3 4 5 6  // 获取一个对象 roleTrieTest = NewRoleTrie() // 根据权限信息生成role拥有的URL正则表达式列表 roleTrieTest.">
+    <link rel="shortcut icon" href="https://user-images.githubusercontent.com/15307132/188314728-04fe4f56-001b-4bc2-867a-50c3182d0082.png" />
+
+    </head>
+    <body class="
+    article-page
+    ">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            localStorage.setItem(colorSchemeKey, "auto");
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
+    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="Toggle Menu">
+        <span class="hamburger-box">
+            <span class="hamburger-inner"></span>
+        </span>
+    </button>
+
+    <header>
+        
+            
+            <figure class="site-avatar">
+                <a href="/">
+                
+                    
+                    
+                    
+                        
+                        <img src="/img/avatar_hu2b53bd9d8e6ccce645265e271155cd47_75253_300x0_resize_box_3.png" width="300"
+                            height="300" class="site-logo" loading="lazy" alt="Avatar">
+                    
+                
+                </a>
+                
+                    <span class="emoji">🧐</span>
+                
+            </figure>
+            
+        
+        
+        <div class="site-meta">
+            <h1 class="site-name"><a href="/">Young 小站</a></h1>
+            <h2 class="site-description">冲啊，无往而不利</h2>
+        </div>
+    </header><ol class="menu" id="main-menu">
+        
+        
+        
+
+        <li >
+            <a href='/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="5 12 3 12 12 3 21 12 19 12" />
+  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
+  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
+</svg>
+
+
+
+                
+                <span>首页</span>
+            </a>
+        </li>
+        
+        
+
+        <li >
+            <a href='/archives/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>归档</span>
+            </a>
+        </li>
+        
+        
+
+        <li >
+            <a href='/search/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+
+                
+                <span>搜索</span>
+            </a>
+        </li>
+        
+        
+
+        <li >
+            <a href='/link/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
+  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
+</svg>
+
+
+
+                
+                <span>链接</span>
+            </a>
+        </li>
+        
+
+        <div class="menu-bottom-section">
+            
+            
+        </div>
+    </ol>
+</aside>
+<main class="main full-width">
+    <article class="main-article">
+    <header class="article-header">
+
+    <div class="article-details">
+    
+    <header class="article-category">
+        
+            <a href="/categories/golang/" >
+                Golang
+            </a>
+        
+    </header>
+    
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="/post/1658727731/">路由匹配方式比较</a>
+        </h2>
+    
+        
+    </div>
+
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published">2022-07-25</time>
+            </div>
+        
+
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-clock" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <polyline points="12 7 12 12 15 15" />
+</svg>
+
+
+
+                <time class="article-time--reading">
+                    2 minute read
+                </time>
+            </div>
+        
+        <div>
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-eye" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="#bababa" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+  <circle cx="12" cy="12" r="2"></circle>
+  <path d="M22 12c-2.667 4.667 -6 7 -10 7s-7.333 -2.333 -10 -7c2.667 -4.667 6 -7 10 -7s7.333 2.333 10 7"></path>
+</svg>
+            <time class="article-time--reading" >
+                <span><span id="busuanzi_value_page_pv"></span>次</span>
+            </time>
+        </div>
+    </footer>
+    
+
+    
+</div>
+</header>
+
+    <section class="article-content">
+    
+    
+    <h3 id="前言">前言</h3>
+<p>做权限验证时，需要对传入的路由与配置的路由进行匹配，判断是否对API有权限。这里比较通过字典树和正则匹配这两种实现方式的性能差异</p>
+<!-- raw HTML omitted -->
+<h3 id="权限信息">权限信息</h3>
+<p>里面主要包含<code>roleId</code>、<code>url</code>、<code>method</code></p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-json" data-lang="json"><span class="p">{</span>
+    <span class="nt">&#34;role_id&#34;</span><span class="p">:</span> <span class="mi">5</span><span class="p">,</span>
+    <span class="nt">&#34;role_name&#34;</span><span class="p">:</span> <span class="s2">&#34;超级管理员&#34;</span><span class="p">,</span>
+    <span class="nt">&#34;apis&#34;</span><span class="p">:</span> <span class="p">[</span>
+        <span class="p">{</span>
+            <span class="nt">&#34;name&#34;</span><span class="p">:</span> <span class="s2">&#34;a&#34;</span><span class="p">,</span>
+            <span class="nt">&#34;url&#34;</span><span class="p">:</span> <span class="s2">&#34;github.com/go-redis/:str/redis/v8&#34;</span><span class="p">,</span>
+            <span class="nt">&#34;method&#34;</span><span class="p">:</span> <span class="s2">&#34;GET&#34;</span>
+        <span class="p">}</span>
+    <span class="p">]</span>
+<span class="p">}</span>
+</code></pre></td></tr></table>
+</div>
+</div><h3 id="字典树的实现方式">字典树的实现方式</h3>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="c1">// 获取一个对象
+</span><span class="c1"></span><span class="nx">roleTrieTest</span> <span class="p">=</span> <span class="nf">NewRoleTrie</span><span class="p">()</span>
+<span class="c1">// 根据权限信息生成树
+</span><span class="c1"></span><span class="nx">roleTrieTest</span><span class="p">.</span><span class="nf">Generate</span><span class="p">(</span><span class="o">*</span><span class="nx">roleInfo</span><span class="p">)</span>
+<span class="c1">// 查找，符合条件返回true
+</span><span class="c1"></span><span class="nx">roleTrieTest</span><span class="p">.</span><span class="nf">Search</span><span class="p">(</span><span class="nx">roleId</span><span class="p">,</span> <span class="nx">url</span><span class="p">,</span> <span class="nx">urlMethod</span><span class="p">)</span>
+</code></pre></td></tr></table>
+</div>
+</div><h3 id="正则匹配的实现方式">正则匹配的实现方式</h3>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="c1">// 获取一个对象
+</span><span class="c1"></span><span class="nx">roleTrieTest</span> <span class="p">=</span> <span class="nf">NewRoleTrie</span><span class="p">()</span>
+<span class="c1">// 根据权限信息生成role拥有的URL正则表达式列表
+</span><span class="c1"></span><span class="nx">roleTrieTest</span><span class="p">.</span><span class="nf">Generate</span><span class="p">(</span><span class="o">*</span><span class="nx">roleInfo</span><span class="p">)</span>
+<span class="c1">// 查找，符合条件返回true
+</span><span class="c1"></span><span class="nx">roleTrieTest</span><span class="p">.</span><span class="nf">Search</span><span class="p">(</span><span class="nx">roleId</span><span class="p">,</span> <span class="nx">url</span><span class="p">,</span> <span class="nx">urlMethod</span><span class="p">)</span>
+</code></pre></td></tr></table>
+</div>
+</div><h3 id="bench-测试代码如下">Bench 测试代码如下</h3>
+<p>测试只针对查找过程，不包含生成查找信息。</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span><span class="lnt">18
+</span><span class="lnt">19
+</span><span class="lnt">20
+</span><span class="lnt">21
+</span><span class="lnt">22
+</span><span class="lnt">23
+</span><span class="lnt">24
+</span><span class="lnt">25
+</span><span class="lnt">26
+</span><span class="lnt">27
+</span><span class="lnt">28
+</span><span class="lnt">29
+</span><span class="lnt">30
+</span><span class="lnt">31
+</span><span class="lnt">32
+</span><span class="lnt">33
+</span><span class="lnt">34
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="kd">func</span> <span class="nf">TestMain</span><span class="p">(</span><span class="nx">m</span> <span class="o">*</span><span class="nx">testing</span><span class="p">.</span><span class="nx">M</span><span class="p">)</span> <span class="p">{</span>
+	<span class="nx">roleInfo</span> <span class="o">:=</span> <span class="nb">new</span><span class="p">(</span><span class="nx">RoleInfo</span><span class="p">)</span>
+	<span class="nx">_</span> <span class="p">=</span> <span class="nx">json</span><span class="p">.</span><span class="nf">Unmarshal</span><span class="p">([]</span><span class="nb">byte</span><span class="p">(</span><span class="nx">apiStr</span><span class="p">),</span> <span class="nx">roleInfo</span><span class="p">)</span>
+
+	<span class="nx">roleTrieTest</span> <span class="p">=</span> <span class="nf">NewRoleTrie</span><span class="p">()</span>
+	<span class="nx">roleTrieTest</span><span class="p">.</span><span class="nf">Generate</span><span class="p">(</span><span class="o">*</span><span class="nx">roleInfo</span><span class="p">)</span>
+
+	<span class="nx">roleRegTest</span> <span class="p">=</span> <span class="nf">NewRegexp</span><span class="p">()</span>
+	<span class="nx">roleRegTest</span><span class="p">.</span><span class="nf">GenerateReg</span><span class="p">(</span><span class="o">*</span><span class="nx">roleInfo</span><span class="p">)</span>
+
+	<span class="nx">m</span><span class="p">.</span><span class="nf">Run</span><span class="p">()</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="nf">Benchmark_TrieSearch</span><span class="p">(</span><span class="nx">b</span> <span class="o">*</span><span class="nx">testing</span><span class="p">.</span><span class="nx">B</span><span class="p">)</span> <span class="p">{</span>
+	<span class="k">for</span> <span class="nx">i</span> <span class="o">:=</span> <span class="mi">0</span><span class="p">;</span> <span class="nx">i</span> <span class="p">&lt;</span> <span class="nx">b</span><span class="p">.</span><span class="nx">N</span><span class="p">;</span> <span class="nx">i</span><span class="o">++</span> <span class="p">{</span>
+		<span class="k">if</span> <span class="nx">roleTrieTest</span><span class="p">.</span><span class="nf">Search</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="nx">url1</span><span class="p">,</span> <span class="nx">http</span><span class="p">.</span><span class="nx">MethodGet</span><span class="p">)</span> <span class="o">!=</span> <span class="kc">true</span> <span class="p">{</span>
+			<span class="nx">b</span><span class="p">.</span><span class="nf">Fatal</span><span class="p">(</span><span class="s">&#34;Benchmark_TrieSearch url1 has failed&#34;</span><span class="p">)</span>
+		<span class="p">}</span>
+		<span class="k">if</span> <span class="nx">roleTrieTest</span><span class="p">.</span><span class="nf">Search</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="nx">url2</span><span class="p">,</span> <span class="nx">http</span><span class="p">.</span><span class="nx">MethodPost</span><span class="p">)</span> <span class="o">!=</span> <span class="kc">false</span> <span class="p">{</span>
+			<span class="nx">b</span><span class="p">.</span><span class="nf">Fatal</span><span class="p">(</span><span class="s">&#34;Benchmark_TrieSearch url2 has failed&#34;</span><span class="p">)</span>
+		<span class="p">}</span>
+	<span class="p">}</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="nf">Benchmark_RegSearch</span><span class="p">(</span><span class="nx">b</span> <span class="o">*</span><span class="nx">testing</span><span class="p">.</span><span class="nx">B</span><span class="p">)</span> <span class="p">{</span>
+	<span class="k">for</span> <span class="nx">i</span> <span class="o">:=</span> <span class="mi">0</span><span class="p">;</span> <span class="nx">i</span> <span class="p">&lt;</span> <span class="nx">b</span><span class="p">.</span><span class="nx">N</span><span class="p">;</span> <span class="nx">i</span><span class="o">++</span> <span class="p">{</span>
+		<span class="k">if</span> <span class="nx">roleRegTest</span><span class="p">.</span><span class="nf">Search</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="nx">url1</span><span class="p">,</span> <span class="nx">http</span><span class="p">.</span><span class="nx">MethodGet</span><span class="p">)</span> <span class="o">!=</span> <span class="kc">true</span> <span class="p">{</span>
+			<span class="nx">b</span><span class="p">.</span><span class="nf">Fatal</span><span class="p">(</span><span class="s">&#34;Benchmark_RegSearch url1 has failed&#34;</span><span class="p">)</span>
+		<span class="p">}</span>
+		<span class="k">if</span> <span class="nx">roleRegTest</span><span class="p">.</span><span class="nf">Search</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="nx">url2</span><span class="p">,</span> <span class="nx">http</span><span class="p">.</span><span class="nx">MethodPost</span><span class="p">)</span> <span class="o">!=</span> <span class="kc">false</span> <span class="p">{</span>
+			<span class="nx">b</span><span class="p">.</span><span class="nf">Fatal</span><span class="p">(</span><span class="s">&#34;Benchmark_RegSearch url2 has failed&#34;</span><span class="p">)</span>
+		<span class="p">}</span>
+	<span class="p">}</span>
+<span class="p">}</span>
+</code></pre></td></tr></table>
+</div>
+</div><h3 id="测试结果">测试结果</h3>
+<p>性能上的差别大概在210倍左右。
+其中<code>RegSearch</code>方法的性能主要在正则匹配上损耗，<code>TrieSearch</code>则主要在对入参的URL进行字符串分割</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span><span class="lnt">8
+</span><span class="lnt">9
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-sh" data-lang="sh">go <span class="nb">test</span> -bench . -benchmem
+goos: windows
+goarch: amd64
+pkg: CodeCollection/search-path
+cpu: AMD Ryzen <span class="m">5</span> 3600X 6-Core Processor
+Benchmark_TrieSearch-12          <span class="m">3217045</span>               371.9 ns/op           <span class="m">160</span> B/op          <span class="m">2</span> allocs/op
+Benchmark_RegSearch-12             <span class="m">15277</span>             <span class="m">78974</span> ns/op           <span class="m">85607</span> B/op        <span class="m">534</span> allocs/op
+PASS
+ok      CodeCollection/search-path      3.856s
+</code></pre></td></tr></table>
+</div>
+</div><h3 id="完整代码">完整代码</h3>
+<p><a class="link" href="https://github.com/wangzhongyang/CodeCollection/tree/main/search-path"  target="_blank" rel="noopener"
+    >完整代码</a></p>
+
+</section>
+
+
+    <footer class="article-footer">
+    
+
+    </footer>
+
+
+    
+        <link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/katex@0.15.6/dist/katex.min.css"integrity="sha256-J&#43;iAE0sgH8QSz9hpcDxXIftnj65JEZgNhGcgReTTK9s="crossorigin="anonymous"
+            ><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.15.6/dist/katex.min.js"integrity="sha256-InsNdER1b2xUewP&#43;pKCUJpkhiqwHgqiPXDlIk7GzBu4="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.15.6/dist/contrib/auto-render.min.js"integrity="sha256-y39Mpg7V3D4lhBX4x6O0bUqTV4pSrfgwEfGKfxkOdgI="crossorigin="anonymous"
+                defer
+                >
+            </script><script>
+    window.addEventListener("DOMContentLoaded", () => {
+        renderMathInElement(document.querySelector(`.article-content`), {
+            delimiters: [
+                { left: "$$", right: "$$", display: true },
+                { left: "$", right: "$", display: false },
+                { left: "\\(", right: "\\)", display: false },
+                { left: "\\[", right: "\\]", display: true }
+            ]
+        });})
+</script>
+    
+</article>
+
+    
+
+    
+
+     
+    
+        
+    <div id="gitalk-container"></div>
+<link
+    rel="stylesheet"
+    href="https://cdn.jsdelivr.net/npm/gitalk@1.7.2/dist/gitalk.css"
+/>
+<script src="https://cdn.jsdelivr.net/npm/gitalk@1.7.2/dist/gitalk.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/blueimp-md5@2.18.0/js/md5.min.js"></script>
+<script>
+    const gitalk = new Gitalk({
+        clientID: "ed3bb383ee05b834b19f",
+        clientSecret: "37c40c77c8f164182a17fa86fc1d9f6c78f4ab33",
+        repo: "blog-gitalk",
+        owner: "youngwang12138",
+        admin: ["youngwang12138"],
+        distractionFreeMode: false, 
+        id: md5(location.pathname), 
+    });
+    (function () {
+        if (
+            ["localhost", "127.0.0.1"].indexOf(window.location.hostname) != -1
+        ) {
+            document.getElementById("gitalk-container").innerHTML =
+                "Gitalk comments not available by default when the website is previewed locally.";
+            return;
+        }
+        gitalk.render("gitalk-container");
+    })();
+</script>
+
+
+
+    
+
+    <footer class="site-footer">
+
+    <section class="copyright">
+        &copy; 
+        
+            2020 - 
+        
+        2022 Young 小站
+    </section>
+    
+    <section class="powerby">
+        
+
+        <a href="https://beian.miit.gov.cn/">赣ICP备2021002737号-1</a><br/>
+    </section>
+
+    <section class="powerby">
+        
+            <span><span id="busuanzi_value_site_uv"></span>次</span>|
+            <span><span id="busuanzi_value_site_pv"></span>次</span>
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+            </main>
+    <aside class="sidebar right-sidebar sticky">
+        
+            
+                
+    <section class="widget archives">
+        <div class="widget-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+        </div>
+        <h2 class="widget-title section-title">Table of contents</h2>
+        
+        <div class="widget--toc">
+            <nav id="TableOfContents">
+  <ol>
+    <li>
+      <ol>
+        <li><a href="#前言">前言</a></li>
+        <li><a href="#权限信息">权限信息</a></li>
+        <li><a href="#字典树的实现方式">字典树的实现方式</a></li>
+        <li><a href="#正则匹配的实现方式">正则匹配的实现方式</a></li>
+        <li><a href="#bench-测试代码如下">Bench 测试代码如下</a></li>
+        <li><a href="#测试结果">测试结果</a></li>
+        <li><a href="#完整代码">完整代码</a></li>
+      </ol>
+    </li>
+  </ol>
+</nav>
+        </div>
+    </section>
+
+            
+        
+    </aside>
+
+
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+    </body>
+</html>

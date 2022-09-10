@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="zh-cn" dir="ltr">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content='前言 每个表中的数据被分成页。构成每个表的页面排列在称为B&#43;树索引的树数据结构中。表数据和二级索引都使用这种类型的结构。页又可以分为数据页和索引页，是MySQL数据存储的最小单元，默认为16kb。B&#43;树中的一个叶子节点是一页
+结构图 其中上半部分为索引页，下半部分为数据页
+数据页 数据行 数据页是磁盘中的一段数据，那么里面记录的就是数据行。数据行是一个单向链表结构，由前一行指向下一行
+页目录 如果数据页里的行数少，那么可以直接遍历。当数据越来越多时，直接遍历就很慢了，那就需要给这些行创建目录&amp;mdash;页目录。 如果页目录如果给每行记录都加一个目录项，那就没有意义了。这里使用稀疏索引，每个目录项记录第一行数据的id。先在页目录中通过二分查找确定目录项，再遍历目录项指向的单向链表遍历数据。MySQL会自动的维护页目录 那么问题来了，如果数据一个数据页放不下，在数据遍历的时候怎么办呢？数据页双向链表的结构优化这个问题。(对应于聚簇索引里叶子节点的双向链表便于遍历)
+索引页 当数据页很多的时候，如何确定去哪页查找数据呢？这就是索引页的作用。 类似于页目录的方式，对每一个数据页提取最小id和页地址信息，通过二分查找的方式确定数据页地址。当数据页很多的时候，随着二叉树高度的增加，查找效率就下降了，有没有更好的方式呢？ 要加快树的查找效率，那就压缩树的高度。把原本每个非叶子节点只存一个数据的形式，改成可以存放16个，树的高度大大降低。 如果记录按顺序插入，索引页的填充因子为15/16，否则是1/2~15/16(随机插入时，会发生频繁的也分裂合并操作，性能很低；且也会数据会变得稀疏不规则，会存在数据碎片)。
+以上数据页加上索引页就形成了聚簇索引。
+一颗聚簇索引可以覆盖多少数据呢 主键索引非叶子节点存放主键值和指针，地址和主键大小按照文档分别为5字节和6字节；每条数据按照500字节算，每个数据页大概可以存放16*1024/500=32条数据。 当树高为1时，root节点为叶子节点，直接存数据16*1024/500=32 当树高为2时，可索引的数据页为16*1024/11=1490，数据量为1460*32=47680 当树高为3时，数据量为1460*1490*32=71043200，在达到这个数据量前，基本就需要考虑分表了。
+缓冲池全部为B&#43;树时可以多少数据呢 缓冲池的默认大小为128M，可以通过参数innodb_buffer_pool_size配置,比如10G。假如128M全部加载B&#43;树，数据量为128*1024/16*32=262144'><title>mysql数据页和索引页</title>
+
+<link rel='canonical' href='https://zhongyang.wang/post/1660050910/'>
+
+<link rel="stylesheet" href="/scss/style.min.ad5538b69fbe914e5aa7385dbe923e0e3144576f59e2781bc977d89c53c9e52e.css"><script async src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script><meta property='og:title' content='mysql数据页和索引页'>
+<meta property='og:description' content='前言 每个表中的数据被分成页。构成每个表的页面排列在称为B&#43;树索引的树数据结构中。表数据和二级索引都使用这种类型的结构。页又可以分为数据页和索引页，是MySQL数据存储的最小单元，默认为16kb。B&#43;树中的一个叶子节点是一页
+结构图 其中上半部分为索引页，下半部分为数据页
+数据页 数据行 数据页是磁盘中的一段数据，那么里面记录的就是数据行。数据行是一个单向链表结构，由前一行指向下一行
+页目录 如果数据页里的行数少，那么可以直接遍历。当数据越来越多时，直接遍历就很慢了，那就需要给这些行创建目录&amp;mdash;页目录。 如果页目录如果给每行记录都加一个目录项，那就没有意义了。这里使用稀疏索引，每个目录项记录第一行数据的id。先在页目录中通过二分查找确定目录项，再遍历目录项指向的单向链表遍历数据。MySQL会自动的维护页目录 那么问题来了，如果数据一个数据页放不下，在数据遍历的时候怎么办呢？数据页双向链表的结构优化这个问题。(对应于聚簇索引里叶子节点的双向链表便于遍历)
+索引页 当数据页很多的时候，如何确定去哪页查找数据呢？这就是索引页的作用。 类似于页目录的方式，对每一个数据页提取最小id和页地址信息，通过二分查找的方式确定数据页地址。当数据页很多的时候，随着二叉树高度的增加，查找效率就下降了，有没有更好的方式呢？ 要加快树的查找效率，那就压缩树的高度。把原本每个非叶子节点只存一个数据的形式，改成可以存放16个，树的高度大大降低。 如果记录按顺序插入，索引页的填充因子为15/16，否则是1/2~15/16(随机插入时，会发生频繁的也分裂合并操作，性能很低；且也会数据会变得稀疏不规则，会存在数据碎片)。
+以上数据页加上索引页就形成了聚簇索引。
+一颗聚簇索引可以覆盖多少数据呢 主键索引非叶子节点存放主键值和指针，地址和主键大小按照文档分别为5字节和6字节；每条数据按照500字节算，每个数据页大概可以存放16*1024/500=32条数据。 当树高为1时，root节点为叶子节点，直接存数据16*1024/500=32 当树高为2时，可索引的数据页为16*1024/11=1490，数据量为1460*32=47680 当树高为3时，数据量为1460*1490*32=71043200，在达到这个数据量前，基本就需要考虑分表了。
+缓冲池全部为B&#43;树时可以多少数据呢 缓冲池的默认大小为128M，可以通过参数innodb_buffer_pool_size配置,比如10G。假如128M全部加载B&#43;树，数据量为128*1024/16*32=262144'>
+<meta property='og:url' content='https://zhongyang.wang/post/1660050910/'>
+<meta property='og:site_name' content='Young 小站'>
+<meta property='og:type' content='article'><meta property='article:section' content='Post' /><meta property='article:published_time' content='2022-08-09T21:15:10&#43;00:00'/><meta property='article:modified_time' content='2022-08-09T21:15:10&#43;00:00'/>
+<meta name="twitter:title" content="mysql数据页和索引页">
+<meta name="twitter:description" content="前言 每个表中的数据被分成页。构成每个表的页面排列在称为B&#43;树索引的树数据结构中。表数据和二级索引都使用这种类型的结构。页又可以分为数据页和索引页，是MySQL数据存储的最小单元，默认为16kb。B&#43;树中的一个叶子节点是一页
+结构图 其中上半部分为索引页，下半部分为数据页
+数据页 数据行 数据页是磁盘中的一段数据，那么里面记录的就是数据行。数据行是一个单向链表结构，由前一行指向下一行
+页目录 如果数据页里的行数少，那么可以直接遍历。当数据越来越多时，直接遍历就很慢了，那就需要给这些行创建目录&amp;mdash;页目录。 如果页目录如果给每行记录都加一个目录项，那就没有意义了。这里使用稀疏索引，每个目录项记录第一行数据的id。先在页目录中通过二分查找确定目录项，再遍历目录项指向的单向链表遍历数据。MySQL会自动的维护页目录 那么问题来了，如果数据一个数据页放不下，在数据遍历的时候怎么办呢？数据页双向链表的结构优化这个问题。(对应于聚簇索引里叶子节点的双向链表便于遍历)
+索引页 当数据页很多的时候，如何确定去哪页查找数据呢？这就是索引页的作用。 类似于页目录的方式，对每一个数据页提取最小id和页地址信息，通过二分查找的方式确定数据页地址。当数据页很多的时候，随着二叉树高度的增加，查找效率就下降了，有没有更好的方式呢？ 要加快树的查找效率，那就压缩树的高度。把原本每个非叶子节点只存一个数据的形式，改成可以存放16个，树的高度大大降低。 如果记录按顺序插入，索引页的填充因子为15/16，否则是1/2~15/16(随机插入时，会发生频繁的也分裂合并操作，性能很低；且也会数据会变得稀疏不规则，会存在数据碎片)。
+以上数据页加上索引页就形成了聚簇索引。
+一颗聚簇索引可以覆盖多少数据呢 主键索引非叶子节点存放主键值和指针，地址和主键大小按照文档分别为5字节和6字节；每条数据按照500字节算，每个数据页大概可以存放16*1024/500=32条数据。 当树高为1时，root节点为叶子节点，直接存数据16*1024/500=32 当树高为2时，可索引的数据页为16*1024/11=1490，数据量为1460*32=47680 当树高为3时，数据量为1460*1490*32=71043200，在达到这个数据量前，基本就需要考虑分表了。
+缓冲池全部为B&#43;树时可以多少数据呢 缓冲池的默认大小为128M，可以通过参数innodb_buffer_pool_size配置,比如10G。假如128M全部加载B&#43;树，数据量为128*1024/16*32=262144">
+    <link rel="shortcut icon" href="https://user-images.githubusercontent.com/15307132/188314728-04fe4f56-001b-4bc2-867a-50c3182d0082.png" />
+
+    </head>
+    <body class="
+    article-page
+    ">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            localStorage.setItem(colorSchemeKey, "auto");
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
+    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="Toggle Menu">
+        <span class="hamburger-box">
+            <span class="hamburger-inner"></span>
+        </span>
+    </button>
+
+    <header>
+        
+            
+            <figure class="site-avatar">
+                <a href="/">
+                
+                    
+                    
+                    
+                        
+                        <img src="/img/avatar_hu2b53bd9d8e6ccce645265e271155cd47_75253_300x0_resize_box_3.png" width="300"
+                            height="300" class="site-logo" loading="lazy" alt="Avatar">
+                    
+                
+                </a>
+                
+                    <span class="emoji">🧐</span>
+                
+            </figure>
+            
+        
+        
+        <div class="site-meta">
+            <h1 class="site-name"><a href="/">Young 小站</a></h1>
+            <h2 class="site-description">冲啊，无往而不利</h2>
+        </div>
+    </header><ol class="menu" id="main-menu">
+        
+        
+        
+
+        <li >
+            <a href='/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="5 12 3 12 12 3 21 12 19 12" />
+  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
+  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
+</svg>
+
+
+
+                
+                <span>首页</span>
+            </a>
+        </li>
+        
+        
+
+        <li >
+            <a href='/archives/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>归档</span>
+            </a>
+        </li>
+        
+        
+
+        <li >
+            <a href='/search/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+
+                
+                <span>搜索</span>
+            </a>
+        </li>
+        
+        
+
+        <li >
+            <a href='/link/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
+  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
+</svg>
+
+
+
+                
+                <span>链接</span>
+            </a>
+        </li>
+        
+
+        <div class="menu-bottom-section">
+            
+            
+        </div>
+    </ol>
+</aside>
+<main class="main full-width">
+    <article class="main-article">
+    <header class="article-header">
+
+    <div class="article-details">
+    
+    <header class="article-category">
+        
+            <a href="/categories/mysql/" >
+                MySQL
+            </a>
+        
+    </header>
+    
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="/post/1660050910/">mysql数据页和索引页</a>
+        </h2>
+    
+        
+    </div>
+
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published">2022-08-09</time>
+            </div>
+        
+
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-clock" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <polyline points="12 7 12 12 15 15" />
+</svg>
+
+
+
+                <time class="article-time--reading">
+                    1 minute read
+                </time>
+            </div>
+        
+        <div>
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-eye" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="#bababa" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+  <circle cx="12" cy="12" r="2"></circle>
+  <path d="M22 12c-2.667 4.667 -6 7 -10 7s-7.333 -2.333 -10 -7c2.667 -4.667 6 -7 10 -7s7.333 2.333 10 7"></path>
+</svg>
+            <time class="article-time--reading" >
+                <span><span id="busuanzi_value_page_pv"></span>次</span>
+            </time>
+        </div>
+    </footer>
+    
+
+    
+</div>
+</header>
+
+    <section class="article-content">
+    
+    
+    <h3 id="前言">前言</h3>
+<p>每个表中的数据被分成页。构成每个表的页面排列在称为B+树索引的树数据结构中。表数据和二级索引都使用这种类型的结构。页又可以分为数据页和索引页，是MySQL数据存储的最小单元，默认为16kb。B+树中的一个叶子节点是一页</p>
+<!-- raw HTML omitted -->
+<h3 id="结构图">结构图</h3>
+<p><img src="/post/1660050910/2022_08_09_mysql_data_and_index_page_1.png"
+	width="1188"
+	height="815"
+	srcset="/post/1660050910/2022_08_09_mysql_data_and_index_page_1_hu44b1cf72c062488fbacbb306b9fb4307_29851_480x0_resize_box_3.png 480w, /post/1660050910/2022_08_09_mysql_data_and_index_page_1_hu44b1cf72c062488fbacbb306b9fb4307_29851_1024x0_resize_box_3.png 1024w"
+	loading="lazy"
+	
+		alt="简单结构图"
+	
+	
+		class="gallery-image" 
+		data-flex-grow="145"
+		data-flex-basis="349px"
+	
+>
+其中上半部分为索引页，下半部分为数据页</p>
+<h3 id="数据页">数据页</h3>
+<h4 id="数据行">数据行</h4>
+<p>数据页是磁盘中的一段数据，那么里面记录的就是数据行。数据行是一个单向链表结构，由前一行指向下一行</p>
+<h4 id="页目录">页目录</h4>
+<p>如果数据页里的行数少，那么可以直接遍历。当数据越来越多时，直接遍历就很慢了，那就需要给这些行创建目录&mdash;页目录。
+如果页目录如果给每行记录都加一个目录项，那就没有意义了。这里使用稀疏索引，每个目录项记录第一行数据的id。先在页目录中通过二分查找确定目录项，再遍历目录项指向的单向链表遍历数据。MySQL会自动的维护页目录
+那么问题来了，如果数据一个数据页放不下，在数据遍历的时候怎么办呢？数据页双向链表的结构优化这个问题。(对应于聚簇索引里叶子节点的双向链表便于遍历)</p>
+<h3 id="索引页">索引页</h3>
+<p>当数据页很多的时候，如何确定去哪页查找数据呢？这就是索引页的作用。
+类似于页目录的方式，对每一个数据页提取最小id和页地址信息，通过二分查找的方式确定数据页地址。当数据页很多的时候，随着二叉树高度的增加，查找效率就下降了，有没有更好的方式呢？
+要加快树的查找效率，那就压缩树的高度。把原本每个非叶子节点只存一个数据的形式，改成可以存放16个，树的高度大大降低。
+如果记录按顺序插入，索引页的填充因子为15/16，否则是1/2~15/16(随机插入时，会发生频繁的也分裂合并操作，性能很低；且也会数据会变得稀疏不规则，会存在数据碎片)。</p>
+<p>以上数据页加上索引页就形成了聚簇索引。</p>
+<h3 id="一颗聚簇索引可以覆盖多少数据呢">一颗聚簇索引可以覆盖多少数据呢</h3>
+<p>主键索引非叶子节点存放主键值和指针，地址和主键大小按照<a class="link" href="https://dev.mysql.com/doc/refman/8.0/en/innodb-row-format.html#innodb-compact-row-format-characteristics"  target="_blank" rel="noopener"
+    >文档</a>分别为5字节和6字节；每条数据按照500字节算，每个数据页大概可以存放<code>16*1024/500=32</code>条数据。
+当树高为1时，root节点为叶子节点，直接存数据<code>16*1024/500=32</code>
+当树高为2时，可索引的数据页为<code>16*1024/11=1490</code>，数据量为<code>1460*32=47680</code>
+当树高为3时，数据量为<code>1460*1490*32=71043200</code>，在达到这个数据量前，基本就需要考虑分表了。</p>
+<h3 id="缓冲池全部为b树时可以多少数据呢">缓冲池全部为B+树时可以多少数据呢</h3>
+<p>缓冲池的默认大小为128M，可以通过参数<code>innodb_buffer_pool_size</code>配置,比如10G。假如128M全部加载B+树，数据量为<code>128*1024/16*32=262144</code></p>
+
+</section>
+
+
+    <footer class="article-footer">
+    
+
+    </footer>
+
+
+    
+        <link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/katex@0.15.6/dist/katex.min.css"integrity="sha256-J&#43;iAE0sgH8QSz9hpcDxXIftnj65JEZgNhGcgReTTK9s="crossorigin="anonymous"
+            ><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.15.6/dist/katex.min.js"integrity="sha256-InsNdER1b2xUewP&#43;pKCUJpkhiqwHgqiPXDlIk7GzBu4="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.15.6/dist/contrib/auto-render.min.js"integrity="sha256-y39Mpg7V3D4lhBX4x6O0bUqTV4pSrfgwEfGKfxkOdgI="crossorigin="anonymous"
+                defer
+                >
+            </script><script>
+    window.addEventListener("DOMContentLoaded", () => {
+        renderMathInElement(document.querySelector(`.article-content`), {
+            delimiters: [
+                { left: "$$", right: "$$", display: true },
+                { left: "$", right: "$", display: false },
+                { left: "\\(", right: "\\)", display: false },
+                { left: "\\[", right: "\\]", display: true }
+            ]
+        });})
+</script>
+    
+</article>
+
+    
+
+    
+
+     
+    
+        
+    <div id="gitalk-container"></div>
+<link
+    rel="stylesheet"
+    href="https://cdn.jsdelivr.net/npm/gitalk@1.7.2/dist/gitalk.css"
+/>
+<script src="https://cdn.jsdelivr.net/npm/gitalk@1.7.2/dist/gitalk.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/blueimp-md5@2.18.0/js/md5.min.js"></script>
+<script>
+    const gitalk = new Gitalk({
+        clientID: "ed3bb383ee05b834b19f",
+        clientSecret: "37c40c77c8f164182a17fa86fc1d9f6c78f4ab33",
+        repo: "blog-gitalk",
+        owner: "youngwang12138",
+        admin: ["youngwang12138"],
+        distractionFreeMode: false, 
+        id: md5(location.pathname), 
+    });
+    (function () {
+        if (
+            ["localhost", "127.0.0.1"].indexOf(window.location.hostname) != -1
+        ) {
+            document.getElementById("gitalk-container").innerHTML =
+                "Gitalk comments not available by default when the website is previewed locally.";
+            return;
+        }
+        gitalk.render("gitalk-container");
+    })();
+</script>
+
+
+
+    
+
+    <footer class="site-footer">
+
+    <section class="copyright">
+        &copy; 
+        
+            2020 - 
+        
+        2022 Young 小站
+    </section>
+    
+    <section class="powerby">
+        
+
+        <a href="https://beian.miit.gov.cn/">赣ICP备2021002737号-1</a><br/>
+    </section>
+
+    <section class="powerby">
+        
+            <span><span id="busuanzi_value_site_uv"></span>次</span>|
+            <span><span id="busuanzi_value_site_pv"></span>次</span>
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+            </main>
+    <aside class="sidebar right-sidebar sticky">
+        
+            
+                
+    <section class="widget archives">
+        <div class="widget-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+        </div>
+        <h2 class="widget-title section-title">Table of contents</h2>
+        
+        <div class="widget--toc">
+            <nav id="TableOfContents">
+  <ol>
+    <li>
+      <ol>
+        <li><a href="#前言">前言</a></li>
+        <li><a href="#结构图">结构图</a></li>
+        <li><a href="#数据页">数据页</a>
+          <ol>
+            <li><a href="#数据行">数据行</a></li>
+            <li><a href="#页目录">页目录</a></li>
+          </ol>
+        </li>
+        <li><a href="#索引页">索引页</a></li>
+        <li><a href="#一颗聚簇索引可以覆盖多少数据呢">一颗聚簇索引可以覆盖多少数据呢</a></li>
+        <li><a href="#缓冲池全部为b树时可以多少数据呢">缓冲池全部为B+树时可以多少数据呢</a></li>
+      </ol>
+    </li>
+  </ol>
+</nav>
+        </div>
+    </section>
+
+            
+        
+    </aside>
+
+
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+    </body>
+</html>

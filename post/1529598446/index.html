@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="zh-cn" dir="ltr">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content='前言 Mysql Binlog是二进制格式的日志文件，但是不能把binlog文件等同于OS系统某目录下的具体文件，这是狭隘的。Binlog是用来记录Mysql内部对数据库的改动（只记录对数据的修改操作），主要用于数据库的主从复制以及增量恢复。
+查看是否开启 1  showVARIABLESlike&amp;#39;%log_bin%&amp;#39;  在MySQL配置文件开启binlog日志的两种方式  第一种 1 2 3 4 5 6  # 开启binlog log_bin=ON # binlog日志的基本文件名 log_bin_basename=/etc/mysql/log_bin_data/log_bin # binlog文件的索引文件，管理所有binlog文件 log_bin_index=/etc/mysql/log_bin_data/log_bin.index    第二种 1 2 3 4  # 开启binlog 这一行在5.7版本不加没有效果 log_bin=ON log-bin=/etc/mysql/log_bin_data/log_bin   binlog 文件路径为 /etc/mysql/log_bin_data/  查看结果 1  showVARIABLESlike&amp;#39;%log_bin%&amp;#39;  查看bin log 文件地址
+1  ls /etc/mysql/log_bin_data/log_bin   解码查看binlog文件 1  mysqlbinlog log_bin.000002 --base64-output=decode-rows -v   '><title>MySQL添加bin-log</title>
+
+<link rel='canonical' href='https://zhongyang.wang/post/1529598446/'>
+
+<link rel="stylesheet" href="/scss/style.min.ad5538b69fbe914e5aa7385dbe923e0e3144576f59e2781bc977d89c53c9e52e.css"><script async src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script><meta property='og:title' content='MySQL添加bin-log'>
+<meta property='og:description' content='前言 Mysql Binlog是二进制格式的日志文件，但是不能把binlog文件等同于OS系统某目录下的具体文件，这是狭隘的。Binlog是用来记录Mysql内部对数据库的改动（只记录对数据的修改操作），主要用于数据库的主从复制以及增量恢复。
+查看是否开启 1  showVARIABLESlike&amp;#39;%log_bin%&amp;#39;  在MySQL配置文件开启binlog日志的两种方式  第一种 1 2 3 4 5 6  # 开启binlog log_bin=ON # binlog日志的基本文件名 log_bin_basename=/etc/mysql/log_bin_data/log_bin # binlog文件的索引文件，管理所有binlog文件 log_bin_index=/etc/mysql/log_bin_data/log_bin.index    第二种 1 2 3 4  # 开启binlog 这一行在5.7版本不加没有效果 log_bin=ON log-bin=/etc/mysql/log_bin_data/log_bin   binlog 文件路径为 /etc/mysql/log_bin_data/  查看结果 1  showVARIABLESlike&amp;#39;%log_bin%&amp;#39;  查看bin log 文件地址
+1  ls /etc/mysql/log_bin_data/log_bin   解码查看binlog文件 1  mysqlbinlog log_bin.000002 --base64-output=decode-rows -v   '>
+<meta property='og:url' content='https://zhongyang.wang/post/1529598446/'>
+<meta property='og:site_name' content='Young 小站'>
+<meta property='og:type' content='article'><meta property='article:section' content='Post' /><meta property='article:tag' content='MySQL' /><meta property='article:published_time' content='2020-02-28T16:08:19&#43;00:00'/><meta property='article:modified_time' content='2020-02-28T16:08:19&#43;00:00'/>
+<meta name="twitter:title" content="MySQL添加bin-log">
+<meta name="twitter:description" content="前言 Mysql Binlog是二进制格式的日志文件，但是不能把binlog文件等同于OS系统某目录下的具体文件，这是狭隘的。Binlog是用来记录Mysql内部对数据库的改动（只记录对数据的修改操作），主要用于数据库的主从复制以及增量恢复。
+查看是否开启 1  showVARIABLESlike&amp;#39;%log_bin%&amp;#39;  在MySQL配置文件开启binlog日志的两种方式  第一种 1 2 3 4 5 6  # 开启binlog log_bin=ON # binlog日志的基本文件名 log_bin_basename=/etc/mysql/log_bin_data/log_bin # binlog文件的索引文件，管理所有binlog文件 log_bin_index=/etc/mysql/log_bin_data/log_bin.index    第二种 1 2 3 4  # 开启binlog 这一行在5.7版本不加没有效果 log_bin=ON log-bin=/etc/mysql/log_bin_data/log_bin   binlog 文件路径为 /etc/mysql/log_bin_data/  查看结果 1  showVARIABLESlike&amp;#39;%log_bin%&amp;#39;  查看bin log 文件地址
+1  ls /etc/mysql/log_bin_data/log_bin   解码查看binlog文件 1  mysqlbinlog log_bin.000002 --base64-output=decode-rows -v   ">
+    <link rel="shortcut icon" href="https://user-images.githubusercontent.com/15307132/188314728-04fe4f56-001b-4bc2-867a-50c3182d0082.png" />
+
+    </head>
+    <body class="
+    article-page
+    ">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            localStorage.setItem(colorSchemeKey, "auto");
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
+    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="Toggle Menu">
+        <span class="hamburger-box">
+            <span class="hamburger-inner"></span>
+        </span>
+    </button>
+
+    <header>
+        
+            
+            <figure class="site-avatar">
+                <a href="/">
+                
+                    
+                    
+                    
+                        
+                        <img src="/img/avatar_hu2b53bd9d8e6ccce645265e271155cd47_75253_300x0_resize_box_3.png" width="300"
+                            height="300" class="site-logo" loading="lazy" alt="Avatar">
+                    
+                
+                </a>
+                
+                    <span class="emoji">🧐</span>
+                
+            </figure>
+            
+        
+        
+        <div class="site-meta">
+            <h1 class="site-name"><a href="/">Young 小站</a></h1>
+            <h2 class="site-description">冲啊，无往而不利</h2>
+        </div>
+    </header><ol class="menu" id="main-menu">
+        
+        
+        
+
+        <li >
+            <a href='/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="5 12 3 12 12 3 21 12 19 12" />
+  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
+  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
+</svg>
+
+
+
+                
+                <span>首页</span>
+            </a>
+        </li>
+        
+        
+
+        <li >
+            <a href='/archives/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>归档</span>
+            </a>
+        </li>
+        
+        
+
+        <li >
+            <a href='/search/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+
+                
+                <span>搜索</span>
+            </a>
+        </li>
+        
+        
+
+        <li >
+            <a href='/link/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
+  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
+</svg>
+
+
+
+                
+                <span>链接</span>
+            </a>
+        </li>
+        
+
+        <div class="menu-bottom-section">
+            
+            
+        </div>
+    </ol>
+</aside>
+<main class="main full-width">
+    <article class="main-article">
+    <header class="article-header">
+
+    <div class="article-details">
+    
+    <header class="article-category">
+        
+            <a href="/categories/mysql/" >
+                MySQL
+            </a>
+        
+    </header>
+    
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="/post/1529598446/">MySQL添加bin-log</a>
+        </h2>
+    
+        
+    </div>
+
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published">2020-02-28</time>
+            </div>
+        
+
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-clock" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <polyline points="12 7 12 12 15 15" />
+</svg>
+
+
+
+                <time class="article-time--reading">
+                    1 minute read
+                </time>
+            </div>
+        
+        <div>
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-eye" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="#bababa" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+  <circle cx="12" cy="12" r="2"></circle>
+  <path d="M22 12c-2.667 4.667 -6 7 -10 7s-7.333 -2.333 -10 -7c2.667 -4.667 6 -7 10 -7s7.333 2.333 10 7"></path>
+</svg>
+            <time class="article-time--reading" >
+                <span><span id="busuanzi_value_page_pv"></span>次</span>
+            </time>
+        </div>
+    </footer>
+    
+
+    
+</div>
+</header>
+
+    <section class="article-content">
+    
+    
+    <h3 id="前言">前言</h3>
+<p>Mysql Binlog是二进制格式的日志文件，但是不能把binlog文件等同于OS系统某目录下的具体文件，这是狭隘的。Binlog是用来记录Mysql内部对数据库的改动（只记录对数据的修改操作），主要用于数据库的主从复制以及增量恢复。</p>
+<!-- raw HTML omitted -->
+<h3 id="查看是否开启">查看是否开启</h3>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-sql" data-lang="sql"><span class="k">show</span><span class="w"> </span><span class="n">VARIABLES</span><span class="w"> </span><span class="k">like</span><span class="w"> </span><span class="s1">&#39;%log_bin%&#39;</span><span class="w">
+</span></code></pre></td></tr></table>
+</div>
+</div><p><img src="/post/1529598446/2019_12_06_MySQL_add_bin-log_1.png"
+	width="784"
+	height="558"
+	srcset="/post/1529598446/2019_12_06_MySQL_add_bin-log_1_hud6941bb8e711ad6a4a17ba376a175436_85608_480x0_resize_box_3.png 480w, /post/1529598446/2019_12_06_MySQL_add_bin-log_1_hud6941bb8e711ad6a4a17ba376a175436_85608_1024x0_resize_box_3.png 1024w"
+	loading="lazy"
+	
+		alt="未开启bin log"
+	
+	
+		class="gallery-image" 
+		data-flex-grow="140"
+		data-flex-basis="337px"
+	
+></p>
+<h3 id="在mysql配置文件开启binlog日志的两种方式">在MySQL配置文件开启binlog日志的两种方式</h3>
+<ul>
+<li>第一种
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"># 开启binlog
+log_bin=ON
+# binlog日志的基本文件名
+log_bin_basename=/etc/mysql/log_bin_data/log_bin
+# binlog文件的索引文件，管理所有binlog文件
+log_bin_index=/etc/mysql/log_bin_data/log_bin.index
+</code></pre></td></tr></table>
+</div>
+</div></li>
+<li>第二种
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"># 开启binlog 这一行在5.7版本不加没有效果
+log_bin=ON
+
+log-bin=/etc/mysql/log_bin_data/log_bin
+</code></pre></td></tr></table>
+</div>
+</div><em>binlog 文件路径为 /etc/mysql/log_bin_data/</em></li>
+</ul>
+<h3 id="查看结果">查看结果</h3>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-sql" data-lang="sql"><span class="k">show</span><span class="w"> </span><span class="n">VARIABLES</span><span class="w"> </span><span class="k">like</span><span class="w"> </span><span class="s1">&#39;%log_bin%&#39;</span><span class="w">
+</span></code></pre></td></tr></table>
+</div>
+</div><p><img src="/2019_12_06_MySQL_add_bin-log_2_.png"
+	
+	
+	
+	loading="lazy"
+	
+		alt="已开启bin log"
+	
+	
+></p>
+<p>查看bin log 文件地址</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-shell" data-lang="shell">ls /etc/mysql/log_bin_data/log_bin
+</code></pre></td></tr></table>
+</div>
+</div><p><img src="/post/1529598446/2019_12_06_MySQL_add_bin-log_3.png"
+	width="470"
+	height="100"
+	srcset="/post/1529598446/2019_12_06_MySQL_add_bin-log_3_hu6fa21a8662efe83a9cd4ab902cd7c807_14472_480x0_resize_box_3.png 480w, /post/1529598446/2019_12_06_MySQL_add_bin-log_3_hu6fa21a8662efe83a9cd4ab902cd7c807_14472_1024x0_resize_box_3.png 1024w"
+	loading="lazy"
+	
+		alt="bin log file"
+	
+	
+		class="gallery-image" 
+		data-flex-grow="470"
+		data-flex-basis="1128px"
+	
+></p>
+<h3 id="解码查看binlog文件">解码查看binlog文件</h3>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"> mysqlbinlog log_bin.000002 --base64-output=decode-rows -v
+</code></pre></td></tr></table>
+</div>
+</div>
+</section>
+
+
+    <footer class="article-footer">
+    
+    <section class="article-tags">
+        
+            <a href="/tags/mysql/">MySQL</a>
+        
+    </section>
+
+
+    </footer>
+
+
+    
+        <link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/katex@0.15.6/dist/katex.min.css"integrity="sha256-J&#43;iAE0sgH8QSz9hpcDxXIftnj65JEZgNhGcgReTTK9s="crossorigin="anonymous"
+            ><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.15.6/dist/katex.min.js"integrity="sha256-InsNdER1b2xUewP&#43;pKCUJpkhiqwHgqiPXDlIk7GzBu4="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.15.6/dist/contrib/auto-render.min.js"integrity="sha256-y39Mpg7V3D4lhBX4x6O0bUqTV4pSrfgwEfGKfxkOdgI="crossorigin="anonymous"
+                defer
+                >
+            </script><script>
+    window.addEventListener("DOMContentLoaded", () => {
+        renderMathInElement(document.querySelector(`.article-content`), {
+            delimiters: [
+                { left: "$$", right: "$$", display: true },
+                { left: "$", right: "$", display: false },
+                { left: "\\(", right: "\\)", display: false },
+                { left: "\\[", right: "\\]", display: true }
+            ]
+        });})
+</script>
+    
+</article>
+
+    
+
+    
+
+     
+    
+        
+    <div id="gitalk-container"></div>
+<link
+    rel="stylesheet"
+    href="https://cdn.jsdelivr.net/npm/gitalk@1.7.2/dist/gitalk.css"
+/>
+<script src="https://cdn.jsdelivr.net/npm/gitalk@1.7.2/dist/gitalk.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/blueimp-md5@2.18.0/js/md5.min.js"></script>
+<script>
+    const gitalk = new Gitalk({
+        clientID: "ed3bb383ee05b834b19f",
+        clientSecret: "37c40c77c8f164182a17fa86fc1d9f6c78f4ab33",
+        repo: "blog-gitalk",
+        owner: "youngwang12138",
+        admin: ["youngwang12138"],
+        distractionFreeMode: false, 
+        id: md5(location.pathname), 
+    });
+    (function () {
+        if (
+            ["localhost", "127.0.0.1"].indexOf(window.location.hostname) != -1
+        ) {
+            document.getElementById("gitalk-container").innerHTML =
+                "Gitalk comments not available by default when the website is previewed locally.";
+            return;
+        }
+        gitalk.render("gitalk-container");
+    })();
+</script>
+
+
+
+    
+
+    <footer class="site-footer">
+
+    <section class="copyright">
+        &copy; 
+        
+            2020 - 
+        
+        2022 Young 小站
+    </section>
+    
+    <section class="powerby">
+        
+
+        <a href="https://beian.miit.gov.cn/">赣ICP备2021002737号-1</a><br/>
+    </section>
+
+    <section class="powerby">
+        
+            <span><span id="busuanzi_value_site_uv"></span>次</span>|
+            <span><span id="busuanzi_value_site_pv"></span>次</span>
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+            </main>
+    <aside class="sidebar right-sidebar sticky">
+        
+            
+                
+    <section class="widget archives">
+        <div class="widget-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+        </div>
+        <h2 class="widget-title section-title">Table of contents</h2>
+        
+        <div class="widget--toc">
+            <nav id="TableOfContents">
+  <ol>
+    <li>
+      <ol>
+        <li><a href="#前言">前言</a></li>
+        <li><a href="#查看是否开启">查看是否开启</a></li>
+        <li><a href="#在mysql配置文件开启binlog日志的两种方式">在MySQL配置文件开启binlog日志的两种方式</a></li>
+        <li><a href="#查看结果">查看结果</a></li>
+        <li><a href="#解码查看binlog文件">解码查看binlog文件</a></li>
+      </ol>
+    </li>
+  </ol>
+</nav>
+        </div>
+    </section>
+
+            
+        
+    </aside>
+
+
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+    </body>
+</html>

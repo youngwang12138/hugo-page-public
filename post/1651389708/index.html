@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="zh-cn" dir="ltr">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content='前言 有时需要查看pod的网络数据包，但pod一般没有tcpdump命令。这里介绍如何在宿主机上对pod进行网络抓包
+nsenter 使用 1 2 3 4 5 6 7 8 9 10 11 12 13 14  nsenter [options] [program [arguments]] options: -t, --target pid：指定被进入命名空间的目标进程的pid -m, --mount[=file]：进入mount命令空间。如果指定了file，则进入file的命令空间 -u, --uts[=file]：进入uts命令空间。如果指定了file，则进入file的命令空间 -i, --ipc[=file]：进入ipc命令空间。如果指定了file，则进入file的命令空间 -n, --net[=file]：进入net命令空间。如果指定了file，则进入file的命令空间 -p, --pid[=file]：进入pid命令空间。如果指定了file，则进入file的命令空间 -U, --user[=file]：进入user命令空间。如果指定了file，则进入file的命令空间 -G, --setgid gid：设置运行程序的gid -S, --setuid uid：设置运行程序的uid -r, --root[=directory]：设置根目录 -w, --wd[=directory]：设置工作目录   抓包步骤 比如要对名为greeter-grpc-cli pod进行抓包
+1 2 3  kubectl get pods greeter-grpc-cli-deployment-5bb97fd9cc-sgmq5 -o wide NAME READY STATUS RESTARTS AGE IP NODE NOMINATED NODE READINESS GATES greeter-grpc-cli-deployment-5bb97fd9cc-sgmq5 2/2 Running 0 21d 10.'><title>对K8S的pod进行抓包</title>
+
+<link rel='canonical' href='https://zhongyang.wang/post/1651389708/'>
+
+<link rel="stylesheet" href="/scss/style.min.ad5538b69fbe914e5aa7385dbe923e0e3144576f59e2781bc977d89c53c9e52e.css"><script async src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script><meta property='og:title' content='对K8S的pod进行抓包'>
+<meta property='og:description' content='前言 有时需要查看pod的网络数据包，但pod一般没有tcpdump命令。这里介绍如何在宿主机上对pod进行网络抓包
+nsenter 使用 1 2 3 4 5 6 7 8 9 10 11 12 13 14  nsenter [options] [program [arguments]] options: -t, --target pid：指定被进入命名空间的目标进程的pid -m, --mount[=file]：进入mount命令空间。如果指定了file，则进入file的命令空间 -u, --uts[=file]：进入uts命令空间。如果指定了file，则进入file的命令空间 -i, --ipc[=file]：进入ipc命令空间。如果指定了file，则进入file的命令空间 -n, --net[=file]：进入net命令空间。如果指定了file，则进入file的命令空间 -p, --pid[=file]：进入pid命令空间。如果指定了file，则进入file的命令空间 -U, --user[=file]：进入user命令空间。如果指定了file，则进入file的命令空间 -G, --setgid gid：设置运行程序的gid -S, --setuid uid：设置运行程序的uid -r, --root[=directory]：设置根目录 -w, --wd[=directory]：设置工作目录   抓包步骤 比如要对名为greeter-grpc-cli pod进行抓包
+1 2 3  kubectl get pods greeter-grpc-cli-deployment-5bb97fd9cc-sgmq5 -o wide NAME READY STATUS RESTARTS AGE IP NODE NOMINATED NODE READINESS GATES greeter-grpc-cli-deployment-5bb97fd9cc-sgmq5 2/2 Running 0 21d 10.'>
+<meta property='og:url' content='https://zhongyang.wang/post/1651389708/'>
+<meta property='og:site_name' content='Young 小站'>
+<meta property='og:type' content='article'><meta property='article:section' content='Post' /><meta property='article:tag' content='k8s' /><meta property='article:published_time' content='2022-05-01T15:21:48&#43;00:00'/><meta property='article:modified_time' content='2022-05-01T15:21:48&#43;00:00'/>
+<meta name="twitter:title" content="对K8S的pod进行抓包">
+<meta name="twitter:description" content="前言 有时需要查看pod的网络数据包，但pod一般没有tcpdump命令。这里介绍如何在宿主机上对pod进行网络抓包
+nsenter 使用 1 2 3 4 5 6 7 8 9 10 11 12 13 14  nsenter [options] [program [arguments]] options: -t, --target pid：指定被进入命名空间的目标进程的pid -m, --mount[=file]：进入mount命令空间。如果指定了file，则进入file的命令空间 -u, --uts[=file]：进入uts命令空间。如果指定了file，则进入file的命令空间 -i, --ipc[=file]：进入ipc命令空间。如果指定了file，则进入file的命令空间 -n, --net[=file]：进入net命令空间。如果指定了file，则进入file的命令空间 -p, --pid[=file]：进入pid命令空间。如果指定了file，则进入file的命令空间 -U, --user[=file]：进入user命令空间。如果指定了file，则进入file的命令空间 -G, --setgid gid：设置运行程序的gid -S, --setuid uid：设置运行程序的uid -r, --root[=directory]：设置根目录 -w, --wd[=directory]：设置工作目录   抓包步骤 比如要对名为greeter-grpc-cli pod进行抓包
+1 2 3  kubectl get pods greeter-grpc-cli-deployment-5bb97fd9cc-sgmq5 -o wide NAME READY STATUS RESTARTS AGE IP NODE NOMINATED NODE READINESS GATES greeter-grpc-cli-deployment-5bb97fd9cc-sgmq5 2/2 Running 0 21d 10.">
+    <link rel="shortcut icon" href="https://user-images.githubusercontent.com/15307132/188314728-04fe4f56-001b-4bc2-867a-50c3182d0082.png" />
+
+    </head>
+    <body class="
+    article-page
+    ">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            localStorage.setItem(colorSchemeKey, "auto");
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
+    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="Toggle Menu">
+        <span class="hamburger-box">
+            <span class="hamburger-inner"></span>
+        </span>
+    </button>
+
+    <header>
+        
+            
+            <figure class="site-avatar">
+                <a href="/">
+                
+                    
+                    
+                    
+                        
+                        <img src="/img/avatar_hu2b53bd9d8e6ccce645265e271155cd47_75253_300x0_resize_box_3.png" width="300"
+                            height="300" class="site-logo" loading="lazy" alt="Avatar">
+                    
+                
+                </a>
+                
+                    <span class="emoji">🧐</span>
+                
+            </figure>
+            
+        
+        
+        <div class="site-meta">
+            <h1 class="site-name"><a href="/">Young 小站</a></h1>
+            <h2 class="site-description">冲啊，无往而不利</h2>
+        </div>
+    </header><ol class="menu" id="main-menu">
+        
+        
+        
+
+        <li >
+            <a href='/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="5 12 3 12 12 3 21 12 19 12" />
+  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
+  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
+</svg>
+
+
+
+                
+                <span>首页</span>
+            </a>
+        </li>
+        
+        
+
+        <li >
+            <a href='/archives/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>归档</span>
+            </a>
+        </li>
+        
+        
+
+        <li >
+            <a href='/search/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+
+                
+                <span>搜索</span>
+            </a>
+        </li>
+        
+        
+
+        <li >
+            <a href='/link/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
+  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
+</svg>
+
+
+
+                
+                <span>链接</span>
+            </a>
+        </li>
+        
+
+        <div class="menu-bottom-section">
+            
+            
+        </div>
+    </ol>
+</aside>
+<main class="main full-width">
+    <article class="main-article">
+    <header class="article-header">
+
+    <div class="article-details">
+    
+    <header class="article-category">
+        
+            <a href="/categories/k8s/" >
+                K8S
+            </a>
+        
+    </header>
+    
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="/post/1651389708/">对K8S的pod进行抓包</a>
+        </h2>
+    
+        
+    </div>
+
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published">2022-05-01</time>
+            </div>
+        
+
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-clock" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <polyline points="12 7 12 12 15 15" />
+</svg>
+
+
+
+                <time class="article-time--reading">
+                    2 minute read
+                </time>
+            </div>
+        
+        <div>
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-eye" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="#bababa" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+  <circle cx="12" cy="12" r="2"></circle>
+  <path d="M22 12c-2.667 4.667 -6 7 -10 7s-7.333 -2.333 -10 -7c2.667 -4.667 6 -7 10 -7s7.333 2.333 10 7"></path>
+</svg>
+            <time class="article-time--reading" >
+                <span><span id="busuanzi_value_page_pv"></span>次</span>
+            </time>
+        </div>
+    </footer>
+    
+
+    
+</div>
+</header>
+
+    <section class="article-content">
+    
+    
+    <h3 id="前言">前言</h3>
+<p>有时需要查看pod的网络数据包，但pod一般没有<code>tcpdump</code>命令。这里介绍如何在宿主机上对pod进行网络抓包</p>
+<!-- raw HTML omitted -->
+<h3 id="nsenter-使用">nsenter 使用</h3>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-sh" data-lang="sh">nsenter <span class="o">[</span>options<span class="o">]</span> <span class="o">[</span>program <span class="o">[</span>arguments<span class="o">]]</span>
+
+options:
+-t, --target pid：指定被进入命名空间的目标进程的pid
+-m, --mount<span class="o">[=</span>file<span class="o">]</span>：进入mount命令空间。如果指定了file，则进入file的命令空间
+-u, --uts<span class="o">[=</span>file<span class="o">]</span>：进入uts命令空间。如果指定了file，则进入file的命令空间
+-i, --ipc<span class="o">[=</span>file<span class="o">]</span>：进入ipc命令空间。如果指定了file，则进入file的命令空间
+-n, --net<span class="o">[=</span>file<span class="o">]</span>：进入net命令空间。如果指定了file，则进入file的命令空间
+-p, --pid<span class="o">[=</span>file<span class="o">]</span>：进入pid命令空间。如果指定了file，则进入file的命令空间
+-U, --user<span class="o">[=</span>file<span class="o">]</span>：进入user命令空间。如果指定了file，则进入file的命令空间
+-G, --setgid gid：设置运行程序的gid
+-S, --setuid uid：设置运行程序的uid
+-r, --root<span class="o">[=</span>directory<span class="o">]</span>：设置根目录
+-w, --wd<span class="o">[=</span>directory<span class="o">]</span>：设置工作目录
+</code></pre></td></tr></table>
+</div>
+</div><h3 id="抓包步骤">抓包步骤</h3>
+<p>比如要对名为<code>greeter-grpc-cli</code> pod进行抓包</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-sh" data-lang="sh">kubectl get pods greeter-grpc-cli-deployment-5bb97fd9cc-sgmq5 -o wide
+NAME                                           READY   STATUS    RESTARTS   AGE   IP           NODE            NOMINATED NODE   READINESS GATES
+greeter-grpc-cli-deployment-5bb97fd9cc-sgmq5   2/2     Running   <span class="m">0</span>          21d   10.32.0.12   vm-4-2-ubuntu   &lt;none&gt;           &lt;none&gt;
+</code></pre></td></tr></table>
+</div>
+</div><ol>
+<li>安装 <code>nsenter</code></li>
+</ol>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-sh" data-lang="sh">apt install util-linux
+</code></pre></td></tr></table>
+</div>
+</div><ol start="2">
+<li>查找<code>containerID</code></li>
+</ol>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span><span class="lnt">8
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-sh" data-lang="sh">crictl ps
+CONTAINER           IMAGE                                                                                                                                       CREATED             STATE               NAME                      ATTEMPT             POD ID
+ccfb9e0db7f97       393cf1d5c95a6                                                                                                                               <span class="m">2</span> weeks ago         Running             istio-proxy               <span class="m">0</span>                   2f84e757f1050
+9d85e6b43e69e       ********/greeter-grpc@sha256:19511605390fb29beb9c87845b13b66b013340c88318c5220073aab72ce75213                                              <span class="m">2</span> weeks ago         Running             greeter-grpc-svc          <span class="m">0</span>                   2f84e757f1050
+74c96c2f11059       393cf1d5c95a6                                                                                                                               <span class="m">2</span> weeks ago         Running             istio-proxy               <span class="m">0</span>                   06be1fe958aa1
+760cde3cabce9       ********/greeter-grpc@sha256:19511605390fb29beb9c87845b13b66b013340c88318c5220073aab72ce75213                                              <span class="m">2</span> weeks ago         Running             greeter-grpc-svc          <span class="m">0</span>                   06be1fe958aa1
+900286bf1bbfe       393cf1d5c95a6                                                                                                                               <span class="m">2</span> weeks ago         Running             istio-proxy               <span class="m">0</span>                   22d9e9f643cb8
+7116f44850a08       ********/greeter-grpc-client@sha256:038dcbc6c3df21dda59d925d6185fe95179aef4418229d1cdf62fbf89e599ce1                                       <span class="m">2</span> weeks ago         Running             greeter-grpc-cli          <span class="m">0</span>                   22d9e9f643cb8
+</code></pre></td></tr></table>
+</div>
+</div><ol start="3">
+<li>查找<code>PID</code></li>
+</ol>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-sh" data-lang="sh">docker top 7116f44850a08
+UID                 PID                 PPID                C                   STIME               TTY                 TIME                CMD
+root                <span class="m">1712108</span>             <span class="m">1712089</span>             <span class="m">0</span>                   Apr10               ?                   00:00:27            /opt/app/server
+</code></pre></td></tr></table>
+</div>
+</div><ol start="4">
+<li>进入pod所在的命名空间</li>
+</ol>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-sh" data-lang="sh">nsenter -n -t <span class="m">1712108</span>
+</code></pre></td></tr></table>
+</div>
+</div><ol start="5">
+<li>查看是否已经进入pod的命名空间
+可以看到此处只显示了两个网卡eth0的地址与上面查看pod的内网地址相同，说明已经进入了</li>
+</ol>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-sh" data-lang="sh">ifconfig
+eth0: <span class="nv">flags</span><span class="o">=</span>4163&lt;UP,BROADCAST,RUNNING,MULTICAST&gt;  mtu <span class="m">1376</span>
+        inet 10.32.0.12  netmask 255.240.0.0  broadcast 10.47.255.255
+        ether b2:0e:5d:4c:d3:70  txqueuelen <span class="m">0</span>  <span class="o">(</span>Ethernet<span class="o">)</span>
+        RX packets <span class="m">6150082</span>  bytes <span class="m">626075350</span> <span class="o">(</span>626.0 MB<span class="o">)</span>
+        RX errors <span class="m">0</span>  dropped <span class="m">0</span>  overruns <span class="m">0</span>  frame <span class="m">0</span>
+        TX packets <span class="m">4340063</span>  bytes <span class="m">449149455</span> <span class="o">(</span>449.1 MB<span class="o">)</span>
+        TX errors <span class="m">0</span>  dropped <span class="m">0</span> overruns <span class="m">0</span>  carrier <span class="m">0</span>  collisions <span class="m">0</span>
+
+lo: <span class="nv">flags</span><span class="o">=</span>73&lt;UP,LOOPBACK,RUNNING&gt;  mtu <span class="m">65536</span>
+        inet 127.0.0.1  netmask 255.0.0.0
+        loop  txqueuelen <span class="m">1000</span>  <span class="o">(</span>Local Loopback<span class="o">)</span>
+        RX packets <span class="m">2728060</span>  bytes <span class="m">401944336</span> <span class="o">(</span>401.9 MB<span class="o">)</span>
+        RX errors <span class="m">0</span>  dropped <span class="m">0</span>  overruns <span class="m">0</span>  frame <span class="m">0</span>
+        TX packets <span class="m">2728060</span>  bytes <span class="m">401944336</span> <span class="o">(</span>401.9 MB<span class="o">)</span>
+        TX errors <span class="m">0</span>  dropped <span class="m">0</span> overruns <span class="m">0</span>  carrier <span class="m">0</span>  collisions <span class="m">0</span>
+</code></pre></td></tr></table>
+</div>
+</div><ol start="6">
+<li>使用<code>tcpdump</code>进行抓包
+此处的端口为pod对外暴露的地址，而不是通过宿主机对外的端口</li>
+</ol>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-sh" data-lang="sh">tcpdump -nnnvv -As <span class="m">0</span> -i eth0 port <span class="m">8000</span> -w test.pcap
+</code></pre></td></tr></table>
+</div>
+</div><ol start="7">
+<li>下载抓包文件<code>test.pcap</code>到本机，使用<code>wireshark</code>查看
+信息如下
+<img src="/2022_05_01_%e5%af%b9K8S%e7%9a%84pod%e8%bf%9b%e8%a1%8c%e6%8a%93%e5%8c%85/%e5%af%b9K8S%e7%9a%84pod%e8%bf%9b%e8%a1%8c%e6%8a%93%e5%8c%85_wireshark.png"
+	
+	
+	
+	loading="lazy"
+	
+		alt="wireshark信息"
+	
+	
+></li>
+</ol>
+
+</section>
+
+
+    <footer class="article-footer">
+    
+    <section class="article-tags">
+        
+            <a href="/tags/k8s/">k8s</a>
+        
+    </section>
+
+
+    </footer>
+
+
+    
+        <link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/katex@0.15.6/dist/katex.min.css"integrity="sha256-J&#43;iAE0sgH8QSz9hpcDxXIftnj65JEZgNhGcgReTTK9s="crossorigin="anonymous"
+            ><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.15.6/dist/katex.min.js"integrity="sha256-InsNdER1b2xUewP&#43;pKCUJpkhiqwHgqiPXDlIk7GzBu4="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.15.6/dist/contrib/auto-render.min.js"integrity="sha256-y39Mpg7V3D4lhBX4x6O0bUqTV4pSrfgwEfGKfxkOdgI="crossorigin="anonymous"
+                defer
+                >
+            </script><script>
+    window.addEventListener("DOMContentLoaded", () => {
+        renderMathInElement(document.querySelector(`.article-content`), {
+            delimiters: [
+                { left: "$$", right: "$$", display: true },
+                { left: "$", right: "$", display: false },
+                { left: "\\(", right: "\\)", display: false },
+                { left: "\\[", right: "\\]", display: true }
+            ]
+        });})
+</script>
+    
+</article>
+
+    
+
+    
+
+     
+    
+        
+    <div id="gitalk-container"></div>
+<link
+    rel="stylesheet"
+    href="https://cdn.jsdelivr.net/npm/gitalk@1.7.2/dist/gitalk.css"
+/>
+<script src="https://cdn.jsdelivr.net/npm/gitalk@1.7.2/dist/gitalk.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/blueimp-md5@2.18.0/js/md5.min.js"></script>
+<script>
+    const gitalk = new Gitalk({
+        clientID: "ed3bb383ee05b834b19f",
+        clientSecret: "37c40c77c8f164182a17fa86fc1d9f6c78f4ab33",
+        repo: "blog-gitalk",
+        owner: "youngwang12138",
+        admin: ["youngwang12138"],
+        distractionFreeMode: false, 
+        id: md5(location.pathname), 
+    });
+    (function () {
+        if (
+            ["localhost", "127.0.0.1"].indexOf(window.location.hostname) != -1
+        ) {
+            document.getElementById("gitalk-container").innerHTML =
+                "Gitalk comments not available by default when the website is previewed locally.";
+            return;
+        }
+        gitalk.render("gitalk-container");
+    })();
+</script>
+
+
+
+    
+
+    <footer class="site-footer">
+
+    <section class="copyright">
+        &copy; 
+        
+            2020 - 
+        
+        2022 Young 小站
+    </section>
+    
+    <section class="powerby">
+        
+
+        <a href="https://beian.miit.gov.cn/">赣ICP备2021002737号-1</a><br/>
+    </section>
+
+    <section class="powerby">
+        
+            <span><span id="busuanzi_value_site_uv"></span>次</span>|
+            <span><span id="busuanzi_value_site_pv"></span>次</span>
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+            </main>
+    <aside class="sidebar right-sidebar sticky">
+        
+            
+                
+    <section class="widget archives">
+        <div class="widget-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+        </div>
+        <h2 class="widget-title section-title">Table of contents</h2>
+        
+        <div class="widget--toc">
+            <nav id="TableOfContents">
+  <ol>
+    <li>
+      <ol>
+        <li><a href="#前言">前言</a></li>
+        <li><a href="#nsenter-使用">nsenter 使用</a></li>
+        <li><a href="#抓包步骤">抓包步骤</a></li>
+      </ol>
+    </li>
+  </ol>
+</nav>
+        </div>
+    </section>
+
+            
+        
+    </aside>
+
+
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+    </body>
+</html>
